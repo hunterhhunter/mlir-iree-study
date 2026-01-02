@@ -1,0 +1,8 @@
+# ninja log v5
+1647	2158	1767158096858650369	my_toy_compiler	de313b675d3019b5
+0	58	1767163292013091454	build.ninja	8decefb1b6e7a3fe
+2	1762	1767163245177105697	CMakeFiles/my_toy_compiler.dir/dummy_main.cpp.o	451759079a28f766
+2	1959	1767163245377105637	CMakeFiles/my_toy_compiler.dir/lib/toy/Ops.cpp.o	c09248c5f8920ed0
+2	1898	1767163245313105658	CMakeFiles/my_toy_compiler.dir/lib/toy/Dialect.cpp.o	840bd2316c6539b4
+1	72	1767163292013091454	build.ninja	8decefb1b6e7a3fe
+1	648	1767163292665091264	my_toy_compiler	7d755d6adb1573a7
