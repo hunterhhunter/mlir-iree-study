@@ -11,19 +11,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "toy/AST.h"
-#include "toy/Dialect.h"
 #include "toy/Lexer.h"
-#include "toy/MLIRGen.h"
 #include "toy/Parser.h"
-#include <memory>
-#include <string>
-#include <system_error>
-#include <utility>
-
-#include "mlir/IR/AsmState.h"
-#include "mlir/IR/BuiltinOps.h"
-#include "mlir/IR/MLIRContext.h"
-#include "mlir/Parser/Parser.h"
 
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/CommandLine.h"
@@ -31,6 +20,27 @@
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/raw_ostream.h"
+
+#include <memory>
+#include <string>
+#include <system_error>
+#include <utility>
+
+// [변경] Chapter 1에서는 MLIR 관련 헤더가 필요 없습니다.
+#ifndef CH1
+#include "mlir/IR/Diagnostics.h"
+#include "toy/Dialect.h"
+#include "toy/MLIRGen.h"
+
+#include "mlir/IR/AsmState.h"
+#include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/MLIRContext.h"
+#include "mlir/IR/Verifier.h"
+#include "mlir/Parser/Parser.h"
+#include "mlir/Pass/PassManager.h"
+#include "mlir/Transforms/Passes.h"
+#include <mlir/IR/OwningOpRef.h>
+#endif
 
 using namespace toy;
 namespace cl = llvm::cl;
@@ -57,6 +67,11 @@ static cl::opt<enum Action> emitAction(
     cl::values(clEnumValN(DumpAST, "ast", "output the AST dump")),
     cl::values(clEnumValN(DumpMLIR, "mlir", "output the MLIR dump")));
 
+// [변경] 최적화 옵션(-opt)은 Chapter 3에서만 활성화됩니다.
+#ifdef CH3
+static cl::opt<bool> enableOpt("opt", cl::desc("Enable Optimizations"));
+#endif
+
 /// Returns a Toy AST resulting from parsing the file or a nullptr on error.
 static std::unique_ptr<toy::ModuleAST>
 parseInputFile(llvm::StringRef filename) {
@@ -72,23 +87,18 @@ parseInputFile(llvm::StringRef filename) {
   return parser.parseModule();
 }
 
-static int dumpMLIR() {
-  mlir::MLIRContext context;
-  // Load our Dialect in this MLIR Context.
-  context.getOrLoadDialect<mlir::toy::ToyDialect>();
-
+// [변경] loadMLIR과 dumpMLIR 함수는 Chapter 1에서 아예 컴파일되지 않게 막습니다.
+#ifndef CH1
+static int loadMLIR(llvm::SourceMgr &sourceMgr, mlir::MLIRContext &context,
+                    mlir::OwningOpRef<mlir::ModuleOp> &module) {
   // Handle '.toy' input to the compiler.
   if (inputType != InputType::MLIR &&
       !llvm::StringRef(inputFilename).ends_with(".mlir")) {
     auto moduleAST = parseInputFile(inputFilename);
     if (!moduleAST)
       return 6;
-    mlir::OwningOpRef<mlir::ModuleOp> module = mlirGen(context, *moduleAST);
-    if (!module)
-      return 1;
-
-    module->dump();
-    return 0;
+    module = mlirGen(context, *moduleAST);
+    return !module ? 1 : 0;
   }
 
   // Otherwise, the input is '.mlir'.
@@ -100,18 +110,45 @@ static int dumpMLIR() {
   }
 
   // Parse the input mlir.
-  llvm::SourceMgr sourceMgr;
   sourceMgr.AddNewSourceBuffer(std::move(*fileOrErr), llvm::SMLoc());
-  mlir::OwningOpRef<mlir::ModuleOp> module =
-      mlir::parseSourceFile<mlir::ModuleOp>(sourceMgr, &context);
+  module = mlir::parseSourceFile<mlir::ModuleOp>(sourceMgr, &context);
   if (!module) {
     llvm::errs() << "Error can't load file " << inputFilename << "\n";
     return 3;
   }
+  return 0;
+}
+
+static int dumpMLIR() {
+  mlir::MLIRContext context;
+  // Load our Dialect in this MLIR Context.
+  context.getOrLoadDialect<mlir::toy::ToyDialect>();
+
+  mlir::OwningOpRef<mlir::ModuleOp> module;
+  llvm::SourceMgr sourceMgr;
+  mlir::SourceMgrDiagnosticHandler sourceMgrHandler(sourceMgr, &context);
+  if (int error = loadMLIR(sourceMgr, context, module))
+    return error;
+
+  // [변경] 실제 최적화 수행 로직은 Chapter 3일 때만 컴파일합니다.
+#ifdef CH3
+  if (enableOpt) {
+    mlir::PassManager pm(module.get()->getName());
+    // Apply any generic pass manager command line options and run the pipeline.
+    if (mlir::failed(mlir::applyPassManagerCLOptions(pm)))
+      return 4;
+
+    // Add a run of the canonicalizer to optimize the mlir module.
+    pm.addNestedPass<mlir::toy::FuncOp>(mlir::createCanonicalizerPass());
+    if (mlir::failed(pm.run(*module)))
+      return 4;
+  }
+#endif
 
   module->dump();
   return 0;
 }
+#endif // End of #ifndef CH1
 
 static int dumpAST() {
   if (inputType == InputType::MLIR) {
@@ -128,16 +165,27 @@ static int dumpAST() {
 }
 
 int main(int argc, char **argv) {
-  // Register any command line options.
+#ifndef CH1
   mlir::registerAsmPrinterCLOptions();
   mlir::registerMLIRContextCLOptions();
+#ifdef CH3
+  mlir::registerPassManagerCLOptions(); // PassManager 옵션은 CH3만
+#endif
+#endif
+
   cl::ParseCommandLineOptions(argc, argv, "toy compiler\n");
 
   switch (emitAction) {
   case Action::DumpAST:
     return dumpAST();
   case Action::DumpMLIR:
+// [변경] dumpMLIR 호출도 Chapter 1에서는 불가능하게 막습니다.
+#ifndef CH1
     return dumpMLIR();
+#else
+    llvm::errs() << "MLIR dump is not supported in Chapter 1.\n";
+    return 1;
+#endif
   default:
     llvm::errs() << "No action specified (parsing only?), use -emit=<action>\n";
   }

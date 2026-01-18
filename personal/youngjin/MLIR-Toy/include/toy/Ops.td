@@ -246,7 +246,7 @@ def PrintOp : Toy_Op<"print"> {
 // ReshapeOp
 //===----------------------------------------------------------------------===//
 
-def ReshapeOp : Toy_Op<"reshape"> {
+def ReshapeOp : Toy_Op<"reshape", [Pure]> {
   let summary = "tensor reshape operation";
   let description = [{
     Reshape operation is transforming its input tensor into a new tensor with
@@ -265,6 +265,8 @@ def ReshapeOp : Toy_Op<"reshape"> {
   let assemblyFormat = [{
     `(` $input `:` type($input) `)` attr-dict `to` type(results)
   }];
+
+  let canonicalization = 1;
 }
 
 //===----------------------------------------------------------------------===//
@@ -312,8 +314,8 @@ def ReturnOp : Toy_Op<"return", [Pure, HasParent<"FuncOp">,
 //===----------------------------------------------------------------------===//
 // TransposeOp
 //===----------------------------------------------------------------------===//
-
-def TransposeOp : Toy_Op<"transpose"> {
+// ch3에서 Transpose 최적화를 위해 최적화된 전치 연산이 제거되지 않는 것을 제거하기 위해 [Pure] 트레이트를 추가
+def TransposeOp : Toy_Op<"transpose", [Pure]> {
   let summary = "transpose operation";
 
   let arguments = (ins F64Tensor:$input);
@@ -330,6 +332,9 @@ def TransposeOp : Toy_Op<"transpose"> {
 
   // Invoke a static verify method to verify this transpose operation.
   let hasVerifier = 1;
+
+  // canonicalization
+  let hasCanonicalizer = 1;
 }
 
 #endif // TOY_OPS

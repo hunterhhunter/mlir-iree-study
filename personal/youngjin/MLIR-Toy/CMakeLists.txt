@@ -19,49 +19,58 @@ include_directories(
   ${LLVM_INCLUDE_DIRS}
 )
 
-# ----------------------------------------------------------------------
-# [Chapter 2 핵심] TableGen: .td 파일을 읽어 C++(.inc) 코드를 자동 생성
-# ----------------------------------------------------------------------
+# ==============================================================================
+# [TableGen] Ops & Dialect (공통)
+# ==============================================================================
 set(LLVM_TARGET_DEFINITIONS include/toy/Ops.td)
 mlir_tablegen(include/toy/Ops.h.inc -gen-op-decls)
 mlir_tablegen(include/toy/Ops.cpp.inc -gen-op-defs)
 mlir_tablegen(include/toy/Dialect.h.inc -gen-dialect-decls)
 mlir_tablegen(include/toy/Dialect.cpp.inc -gen-dialect-defs)
 
-add_custom_target(ToyCh2OpsIncGen DEPENDS
+add_custom_target(ToyOpsIncGen DEPENDS
   include/toy/Ops.h.inc
   include/toy/Ops.cpp.inc
   include/toy/Dialect.h.inc
   include/toy/Dialect.cpp.inc
 )
 
+# ==============================================================================
+# [TableGen 2] Optimization Patterns .td로 작성한 최적화 코드 생성
+# ==============================================================================
+set(LLVM_TARGET_DEFINITIONS include/toy/ToyCombine.td)
+# -gen-rewriters 옵션: .td를 읽어서 패턴 매칭 C++ 코드를 만들어라!
+mlir_tablegen(include/toy/ToyCombine.inc -gen-rewriters)
 
-# ----------------------------------------------------------------------
-# [Target 1] Chapter 1: AST 파서 (기존 유지)
-# ----------------------------------------------------------------------
+add_custom_target(ToyCombineIncGen DEPENDS
+  include/toy/ToyCombine.inc
+)
+
+# ==============================================================================
+# [Target 1] Chapter 1: AST 파서 (toyc-ch1)
+# ==============================================================================
 add_executable(toyc-ch1
   toyc.cpp
   parser/AST.cpp
 )
+# [중요] 소스코드 안에서 "#ifdef CH1"으로 구분하기 위해 정의
+target_compile_definitions(toyc-ch1 PRIVATE CH1) 
 target_link_libraries(toyc-ch1 PRIVATE LLVMSupport)
 target_compile_options(toyc-ch1 PRIVATE -fno-rtti)
 
 
-# ----------------------------------------------------------------------
-# [Target 2] Chapter 2: MLIR 생성 (NEW!)
-# ----------------------------------------------------------------------
+# ==============================================================================
+# [Target 2] Chapter 2: MLIR 생성 (toyc-ch2)
+# ==============================================================================
 add_executable(toyc-ch2
-  toyc.cpp              # 메인 (업데이트 필요)
-  parser/AST.cpp        # AST 덤프
-  lib/toy/MLIRGen.cpp   # [중요] AST -> MLIR 변환 로직 (파일 확인 필요!)
-  lib/toy/Dialect.cpp   # MLIR Dialect 정의
-  # lib/toy/Ops.cpp       # MLIR Operation 정의
+  toyc.cpp
+  parser/AST.cpp
+  lib/toy/MLIRGen.cpp
+  lib/toy/Dialect.cpp
+  lib/toy/ToyCombine.cpp
 )
-
-# .inc 파일 생성 후 빌드하도록 의존성 설정
-add_dependencies(toyc-ch2 ToyCh2OpsIncGen)
-
-# MLIR 라이브러리 링크
+add_dependencies(toyc-ch2 ToyOpsIncGen)
+target_compile_definitions(toyc-ch2 PRIVATE CH2) # CH2 정의
 target_link_libraries(toyc-ch2 PRIVATE
   MLIRIR
   MLIRParser
@@ -72,5 +81,32 @@ target_link_libraries(toyc-ch2 PRIVATE
   MLIRSupport
   LLVMSupport
 )
-
 target_compile_options(toyc-ch2 PRIVATE -fno-rtti)
+
+
+# ==============================================================================
+# [Target 3] Chapter 3: 최적화 (toyc-ch3)
+# ==============================================================================
+add_executable(toyc-ch3
+  toyc.cpp
+  parser/AST.cpp
+  lib/toy/MLIRGen.cpp
+  lib/toy/Dialect.cpp
+  lib/toy/ToyCombine.cpp 
+)
+add_dependencies(toyc-ch3 ToyOpsIncGen)
+target_compile_definitions(toyc-ch3 PRIVATE CH3) # CH3 정의
+target_link_libraries(toyc-ch3 PRIVATE
+  MLIRIR
+  MLIRParser
+  MLIRPass                
+  MLIRTransforms          
+  MLIRAnalysis            
+  MLIRSideEffectInterfaces
+  MLIRCallInterfaces
+  MLIRCastInterfaces
+  MLIRFunctionInterfaces
+  MLIRSupport
+  LLVMSupport
+)
+target_compile_options(toyc-ch3 PRIVATE -fno-rtti)
