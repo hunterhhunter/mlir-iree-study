@@ -18,8 +18,11 @@
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/Interfaces/CallInterfaces.h"
+#include "mlir/Interfaces/CastInterfaces.h"         // ch4-inliner에서 추가 CastOp를 위해
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
+#include "toy/ShapeInferenceOpInterfaces.h.inc"
+
 
 /// Include the auto-generated header file containing the declaration of the toy
 /// dialect.

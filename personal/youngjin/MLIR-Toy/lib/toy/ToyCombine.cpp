@@ -5,10 +5,11 @@
 using namespace mlir;
 using namespace toy;
 
-// namespace {
-// /// 선언적 재정의 패턴의 내용을 포함
-// #include "ToyCombine.inc"
-// } // namespace
+// ch3-optimization에서 추가
+namespace {
+/// 선언적 재정의 패턴의 내용을 포함
+    #include "toy/ToyCombine.inc"
+} // namespace
 
 /// TransposeOp를 C++ 스타일로 재작성패턴 정의
 struct SimplifyRedundantTranspose : public mlir::OpRewritePattern<TransposeOp> {

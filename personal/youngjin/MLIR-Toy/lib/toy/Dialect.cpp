@@ -16,23 +16,90 @@
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/Location.h"
 #include "mlir/IR/OpImplementation.h"
-#include "mlir/IR/Operation.h"
 #include "mlir/IR/OperationSupport.h"
-#include "mlir/IR/Value.h"
+#include "mlir/IR/ValueRange.h"
+#include "mlir/Interfaces/CallInterfaces.h"
 #include "mlir/Interfaces/FunctionImplementation.h"
 #include "mlir/Support/LLVM.h"
+#include "mlir/Transforms/InliningUtils.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Casting.h"
 #include <algorithm>
+#include <cassert>
+#include <cstdint>
+#include <mlir/IR/BuiltinAttributes.h>
 #include <string>
 
 using namespace mlir;
 using namespace mlir::toy;
 
 #include "toy/Dialect.cpp.inc"
+
+//===----------------------------------------------------------------------===//
+// ToyInlinerInterface
+//===----------------------------------------------------------------------===//
+
+// 인라이닝을 위한 인터페이스 정의 - MLIR에 정의된 Dialect Inliner Interface 상속
+// DialectInlinerInterface는 Toy언어가 Inlining을 지원한다는걸 Pass Manager에게 알리는 Hook 집합
+struct ToyInlinerInterface : public DialectInlinerInterface {
+  using DialectInlinerInterface::DialectInlinerInterface;
+
+  //===--------------------------------------------------------------------===//
+  // Analysis Hooks
+  //===--------------------------------------------------------------------===//
+
+  // Operation이 Operation을 호출할 때 모든 인라이닝을 활성화
+  bool isLegalToInline(Operation *call, Operation *callable,
+                       bool wouldBeCloned) const final {
+    return true;
+  }
+
+  // Operation이 Region으로 이동해도 문제가 없는가?
+  bool isLegalToInline(Operation *, Region *, bool, IRMapping &) const final {
+    return true;
+  }
+
+  // Region(본문)이 Region으로 이동해도(통째로 복사) 괜찮은가
+  // IRMapping은
+  bool isLegalToInline(Region *, Region *, bool, IRMapping &) const final {
+    return true;
+  }
+
+  //===--------------------------------------------------------------------===//
+  // Transformation Hooks
+  //===--------------------------------------------------------------------===//
+
+  // 인라이닝은 SSA(Static Single ASsignment) 그래프를 다시 그리는 과정으로
+  // 함수가 사라지면 함수의 끝을 알리던 Terminator(toy.return)이 처리되어야함.
+  // MLIR의 InlinerPass, InlinerCall 유틸리티 실행시 내부적을 호출되는 훅
+  void handleTerminator(Operation *op, ValueRange valuesToRepl) const final {
+    // op를 ReturnOp로 캐스팅 - 인자인 op는 인라이닝된 Region이 종결자임이 보장
+    auto returnOp = cast<ReturnOp>(op);
+    assert(returnOp->getNumOperands() == valuesToRepl.size());
+    // 핵심 로직: returnOp의 피연산자를
+    // valuesToRepl: mlir::Value 객체들의 집합 -> 메모리상 존재하는 특정 Operation의 결과물에 대한 Pointer
+    for (const auto &it : llvm::enumerate(returnOp.getOperands()))
+      // 인라이닝이 끝나면 함수 본문이 main 안으로들어옴
+      // 함수 내부에서 계산된 진짜 결과값(예: %arg0)이 returnOp.getOperands()에 들어있는 value
+      // valuesToRepl은 main에서 generic_call의 결과값을 담기로 되어있었는데 generic_call이 사라짐
+      // 그래서 내부에 함수의 실행 결과를 채워야함.
+      // 이건 연산의 결과로 채우면 됨.
+      valuesToRepl[it.index()].replaceAllUsesWith(it.value());
+  }
+
+  // 원래는 input과 resultType간의 캐스팅 가능여부 검사가 필요하나 toy라서
+  // 바로 CastOp가 들어가도록 추가
+  Operation *materializeCallConversion(OpBuilder &builder, Value input,
+                                       Type resultType,
+                                       Location  conversionLoc) const final {
+    return CastOp::create(builder, conversionLoc, resultType, input);
+  }
+};
 
 //===----------------------------------------------------------------------===//
 // ToyDialect
@@ -45,6 +112,7 @@ void ToyDialect::initialize() {
 #define GET_OP_LIST
 #include "toy/Ops.cpp.inc"
       >();
+  addInterfaces<ToyInlinerInterface>(); // ch4-inliner에서 추가
 }
 
 //===----------------------------------------------------------------------===//
@@ -186,6 +254,35 @@ mlir::ParseResult AddOp::parse(mlir::OpAsmParser &parser,
 
 void AddOp::print(mlir::OpAsmPrinter &p) { printBinaryOp(p, *this); }
 
+void AddOp::inferShapes() { getResult().setType(getLhs().getType()); }
+
+
+//===----------------------------------------------------------------------===//
+// CastOp
+//===----------------------------------------------------------------------===//
+
+/// Infer the output shape of the CastOp, this is required by the shape
+/// inference interface.
+// ch4-shapeinference에서 추가
+// 260119 ch4 - shapeinference
+ void CastOp::inferShapes() { getResult().setType(getInput().getType()); }
+
+
+// ch4-inliner에서 추가
+//  ch4 - inliner 발표
+bool CastOp::areCastCompatible(TypeRange inputs, TypeRange outputs) {
+  if (inputs.size() != 1 || outputs.size() != 1)
+    return false;
+  // 입력과 출력이 모두 같아야함
+  TensorType input = llvm::dyn_cast<TensorType>(inputs.front());
+  TensorType output = llvm::dyn_cast<TensorType>(outputs.front());
+  if (!input || !output || input.getElementType() != output.getElementType())
+    return false;
+  // The shape is required to match if both types are ranked.
+  return !input.hasRank() || !output.hasRank() || input == output;
+}
+
+
 //===----------------------------------------------------------------------===//
 // GenericCallOp
 //===----------------------------------------------------------------------===//
@@ -197,6 +294,55 @@ void GenericCallOp::build(mlir::OpBuilder &builder, mlir::OperationState &state,
   state.addOperands(arguments);
   state.addAttribute("callee",
                      mlir::SymbolRefAttr::get(builder.getContext(), callee));
+}
+
+// 아래 함수들은 모두 인라이닝을 위한 함수들로
+// CallOpInterface를 Trait으로 등록하면 구현해줘야하는 함수들
+// 
+/// Return the callee of the generic call operation, this is required by the
+/// call interface.
+// 호출 연산이 어떤 함수를 가리키는가를 return
+CallInterfaceCallable GenericCallOp::getCallableForCallee() {
+  return (*this)->getAttrOfType<SymbolRefAttr>("callee");
+}
+
+/// Set the callee for the generic call operation, this is required by the call
+/// interface.
+// callee 속성에 
+void GenericCallOp::setCalleeFromCallable(CallInterfaceCallable callee) {
+  (*this)->setAttr("callee", cast<SymbolRefAttr>(callee));
+}
+
+/// Get the argument operands to the called function, this is required by the
+/// call interface.
+// 입력 인자 가져오기
+Operation::operand_range GenericCallOp::getArgOperands() { return getInputs(); }
+
+/// Get the argument operands to the called function as a mutable range, this is
+/// required by the call interface.
+// 인라이닝 도중 타입이 맞지 않아 toy.cast를 끼워넣거나 할 때,
+// 원래 있던 입력값 리스트를 직접 수정할 수 있는 권한을 부여
+MutableOperandRange GenericCallOp::getArgOperandsMutable() {
+  return getInputsMutable();
+}
+
+// 260119 ch4 - shapeinference
+void GenericCallOp::inferShapes() {
+  // 1. 호출 대상 함수(Callee) 찾기
+  auto endpoints = getOperation()->getParentOfType<mlir::ModuleOp>().lookupSymbol<FuncOp>(getCallee());
+  if (!endpoints)
+    return;
+
+  // 2. 함수의 리턴 타입 가져오기 (여기서는 아직 일반 Type)
+  auto resultType = endpoints.getFunctionType().getResult(0);
+
+  // 3. 만약 리턴 타입이 Unranked(모름)라면 추론 중단
+  if (llvm::isa<UnrankedTensorType>(resultType))
+    return;
+
+  // 4. 리턴 타입을 TensorType으로 캐스팅하여 설정
+  //    (Type -> TensorType 변환이 필요합니다)
+  getResult().setType(cast<TensorType>(resultType));
 }
 
 //===----------------------------------------------------------------------===//
@@ -235,6 +381,8 @@ void FuncOp::print(mlir::OpAsmPrinter &p) {
       getArgAttrsAttrName(), getResAttrsAttrName());
 }
 
+
+
 //===----------------------------------------------------------------------===//
 // MulOp
 //===----------------------------------------------------------------------===//
@@ -251,6 +399,9 @@ mlir::ParseResult MulOp::parse(mlir::OpAsmParser &parser,
 }
 
 void MulOp::print(mlir::OpAsmPrinter &p) { printBinaryOp(p, *this); }
+
+// 260119 ch4 - shapeinference
+void MulOp::inferShapes() { getResult().setType(getLhs().getType()); }
 
 //===----------------------------------------------------------------------===//
 // ReturnOp
@@ -299,6 +450,16 @@ void TransposeOp::build(mlir::OpBuilder &builder, mlir::OperationState &state,
   state.addOperands(value);
 }
 
+// 260119 ch4 - shapeinference
+void TransposeOp::inferShapes() {
+  // 입력값의 Type 조회
+  auto arrayTy = llvm::cast<RankedTensorType>(getOperand().getType());
+  // 가져온 Type의 Shape을 reverse
+  SmallVector<int64_t, 2> dims(llvm::reverse(arrayTy.getShape()));
+  // 출력의 타입으로 설정
+  getResult().setType(RankedTensorType::get(dims, arrayTy.getElementType()));
+}
+
 llvm::LogicalResult TransposeOp::verify() {
   auto inputType = llvm::dyn_cast<RankedTensorType>(getOperand().getType());
   auto resultType = llvm::dyn_cast<RankedTensorType>(getType());
@@ -320,3 +481,5 @@ llvm::LogicalResult TransposeOp::verify() {
 
 #define GET_OP_CLASSES
 #include "toy/Ops.cpp.inc"
+
+#include "toy/ShapeInferenceOpInterfaces.cpp.inc"

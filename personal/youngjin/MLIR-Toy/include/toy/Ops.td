@@ -17,6 +17,10 @@ include "mlir/IR/OpBase.td"
 include "mlir/Interfaces/FunctionInterfaces.td"
 include "mlir/IR/SymbolInterfaces.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
+include "mlir/Interfaces/CallInterfaces.td" // ch4-inliner에서 추가
+include "mlir/Interfaces/CastInterfaces.td" // ch4-inliner에서 추가
+
+include "toy/ShapeInferenceInterface.td"    // ch4-shapeinference에서 추가
 
 // Provide a definition of the 'toy' dialect in the ODS framework so that we
 // can define our operations.
@@ -89,7 +93,8 @@ def ConstantOp : Toy_Op<"constant", [Pure]> {
 // AddOp
 //===----------------------------------------------------------------------===//
 
-def AddOp : Toy_Op<"add"> {
+def AddOp : Toy_Op<"add",
+  [Pure, DeclareOpInterfaceMethods<ShapeInferenceOpInterface>]> {
   let summary = "element-wise addition operation";
   let description = [{
     The "add" operation performs element-wise addition between two tensors.
@@ -106,6 +111,34 @@ def AddOp : Toy_Op<"add"> {
   let builders = [
     OpBuilder<(ins "Value":$lhs, "Value":$rhs)>
   ];
+}
+
+//===----------------------------------------------------------------------===//
+// CastOp
+//===----------------------------------------------------------------------===//
+// ch4-inliner에서 추가
+// 260119 ch4 - inliner 발표
+def CastOp : Toy_Op<"cast", [
+     // CastOpInterface를 지원한다고 선언 - lib/toy/Dialect.cpp에 CastOp가 구현되어있음.
+     DeclareOpInterfaceMethods<CastOpInterface>,
+     DeclareOpInterfaceMethods<ShapeInferenceOpInterface>,
+     Pure,
+     SameOperandsAndResultShape
+  ]> {
+  let summary = "shape cast operation";
+  let description = [{
+    The "cast" operation converts a tensor from one type to an equivalent type
+    without changing any data elements. The source and destination types must
+    both be tensor types with the same element type. If both are ranked, then
+    shape is required to match. The operation is invalid if converting to a
+    mismatching constant dimension.
+  }];
+
+  let arguments = (ins F64Tensor:$input);
+  let results = (outs F64Tensor:$output);
+
+  let assemblyFormat = "$input attr-dict `:` type($input) `to` type($output)";
+  // let hasVerifier = 1;
 }
 
 //===----------------------------------------------------------------------===//
@@ -134,9 +167,9 @@ def FuncOp : Toy_Op<"func", [
 
   let arguments = (ins
     SymbolNameAttr:$sym_name,
-    TypeAttrOf<FunctionType>:$function_type,
-    OptionalAttr<DictArrayAttr>:$arg_attrs,
-    OptionalAttr<DictArrayAttr>:$res_attrs
+    TypeAttrOf<FunctionType>:$function_type, 
+    OptionalAttr<DictArrayAttr>:$arg_attrs, // ch4-inliner에서 추가
+    OptionalAttr<DictArrayAttr>:$res_attrs // ch4-inliner에서 추가
   );
   let regions = (region AnyRegion:$body);
 
@@ -167,7 +200,11 @@ def FuncOp : Toy_Op<"func", [
 // GenericCallOp
 //===----------------------------------------------------------------------===//
 
-def GenericCallOp : Toy_Op<"generic_call"> {
+// 260119 - ch4 inliner 발표
+def GenericCallOp : Toy_Op<"generic_call",
+     // 기본 함수 호출 Operation 등록
+    [DeclareOpInterfaceMethods<CallOpInterface>,                // ch4-inliner에서 추가 
+     DeclareOpInterfaceMethods<ShapeInferenceOpInterface>] > {  // cht-shapeinference에서 추가
   let summary = "generic call operation";
   let description = [{
     Generic calls represent calls to a user defined function that needs to
@@ -186,7 +223,15 @@ def GenericCallOp : Toy_Op<"generic_call"> {
 
   // The generic call operation takes a symbol reference attribute as the
   // callee, and inputs for the call.
-  let arguments = (ins FlatSymbolRefAttr:$callee, Variadic<F64Tensor>:$inputs);
+  // CallOpInterface를 등록한 순간 MLIR의 CallOpInterface는
+  // 함수 호출에는 인자 속성이 있을 수 있다고 알고있기에
+  // attrs를 등록해야함.
+  let arguments = (
+    ins FlatSymbolRefAttr:$callee, 
+    Variadic<F64Tensor>:$inputs,
+    OptionalAttr<DictArrayAttr>:$arg_attrs,
+    OptionalAttr<DictArrayAttr>:$res_attrs
+  );
 
   // The generic call operation returns a single value of TensorType.
   let results = (outs F64Tensor);
@@ -206,7 +251,8 @@ def GenericCallOp : Toy_Op<"generic_call"> {
 // MulOp
 //===----------------------------------------------------------------------===//
 
-def MulOp : Toy_Op<"mul"> {
+def MulOp : Toy_Op<"mul",
+  [Pure, DeclareOpInterfaceMethods<ShapeInferenceOpInterface>]> { // ch4 - shapeInference에서 추가
   let summary = "element-wise multiplication operation";
   let description = [{
     The "mul" operation performs element-wise multiplication between two
@@ -266,7 +312,7 @@ def ReshapeOp : Toy_Op<"reshape", [Pure]> {
     `(` $input `:` type($input) `)` attr-dict `to` type(results)
   }];
 
-  let canonicalization = 1;
+  let hasCanonicalizer = 1;
 }
 
 //===----------------------------------------------------------------------===//
@@ -315,7 +361,8 @@ def ReturnOp : Toy_Op<"return", [Pure, HasParent<"FuncOp">,
 // TransposeOp
 //===----------------------------------------------------------------------===//
 // ch3에서 Transpose 최적화를 위해 최적화된 전치 연산이 제거되지 않는 것을 제거하기 위해 [Pure] 트레이트를 추가
-def TransposeOp : Toy_Op<"transpose", [Pure]> {
+def TransposeOp : Toy_Op<"transpose", 
+  [Pure, DeclareOpInterfaceMethods<ShapeInferenceOpInterface>]> {
   let summary = "transpose operation";
 
   let arguments = (ins F64Tensor:$input);

@@ -1,4 +1,4 @@
-
+// CMakeLists의 편의를 위해 lib/toy -> include/toy로 이동
 
 #ifndef TOY_COMBINE
 #define TOY_COMBINE
@@ -19,7 +19,7 @@ include "toy/Ops.td"
 
 // Basic Patter-Match and Rewrite
 // Reshape pattern - reshape(reshape(a)) = a
-def ReshapeReshapeOptPattern : Pat<(ReshapeOp(ReshapeOp %arg)), 
+def ReshapeReshapeOptPattern : Pat<(ReshapeOp(ReshapeOp $arg)), 
                                    (ReshapeOp $arg)>;
 
 
@@ -44,4 +44,4 @@ def RedundantReshapeOptPattern : Pat<
     (ReshapeOp:$res $arg), (replaceWithValue $arg),
     [(TypesAreIdentical $res, $arg)]>;
 
-#endif
+#endif // TOY_COMBINE

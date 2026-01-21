@@ -31,6 +31,7 @@
 #include "mlir/IR/Diagnostics.h"
 #include "toy/Dialect.h"
 #include "toy/MLIRGen.h"
+#include "toy/Passes.h"
 
 #include "mlir/IR/AsmState.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -67,8 +68,8 @@ static cl::opt<enum Action> emitAction(
     cl::values(clEnumValN(DumpAST, "ast", "output the AST dump")),
     cl::values(clEnumValN(DumpMLIR, "mlir", "output the MLIR dump")));
 
-// [변경] 최적화 옵션(-opt)은 Chapter 3에서만 활성화됩니다.
-#ifdef CH3
+// 최적화 옵션(-opt)은 Chapter 3에서만 활성화됩니다.
+#if defined (CH3) || defined (CH4)
 static cl::opt<bool> enableOpt("opt", cl::desc("Enable Optimizations"));
 #endif
 
@@ -131,13 +132,28 @@ static int dumpMLIR() {
     return error;
 
   // [변경] 실제 최적화 수행 로직은 Chapter 3일 때만 컴파일합니다.
-#ifdef CH3
+#if defined (CH3) || defined (CH4)
   if (enableOpt) {
     mlir::PassManager pm(module.get()->getName());
     // Apply any generic pass manager command line options and run the pipeline.
     if (mlir::failed(mlir::applyPassManagerCLOptions(pm)))
       return 4;
+    
+    #ifdef CH4
+    // ch4-inliner에서 추가
+    pm.addPass(mlir::createInlinerPass());
+    // Now that there is only one function, we can infer the shapes of each of
+    // the operations.
+    // uncOp는 외부 환경과 격리된(IsolateFromAbove) 특성을 가져
+    // 함수 내부의 최적화가 다른 함수의 IR구조에 직접적인 영향을 주지 않음
+    // 따라서 pm.nest를 사용하면 개별 func연산에 집중해 병렬 최적화 + 패스 로컬리티가 가능함.
+    mlir::OpPassManager &optPM = pm.nest<mlir::toy::FuncOp>();
+    optPM.addPass(mlir::toy::createShapeInferencePass());
+    optPM.addPass(mlir::createCanonicalizerPass());
+    optPM.addPass(mlir::createCSEPass());
 
+    #endif
+    
     // Add a run of the canonicalizer to optimize the mlir module.
     pm.addNestedPass<mlir::toy::FuncOp>(mlir::createCanonicalizerPass());
     if (mlir::failed(pm.run(*module)))
@@ -168,7 +184,7 @@ int main(int argc, char **argv) {
 #ifndef CH1
   mlir::registerAsmPrinterCLOptions();
   mlir::registerMLIRContextCLOptions();
-#ifdef CH3
+#if defined(CH3) || defined(CH4)
   mlir::registerPassManagerCLOptions(); // PassManager 옵션은 CH3만
 #endif
 #endif

@@ -174,6 +174,11 @@ private:
           function.getFunctionType().getInputs(), getType(VarType{})));
     }
 
+    // ch4-inliner에서 추가
+    // 260119 - ch4 - inliner 발표
+    if (funcAST.getProto()->getName() != "main")
+      function.setPrivate();
+
     return function;
   }
 
