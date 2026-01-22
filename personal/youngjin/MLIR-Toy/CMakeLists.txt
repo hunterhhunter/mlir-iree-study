@@ -174,3 +174,34 @@ target_link_libraries(toyc-ch4 PRIVATE
   MLIRFunctionInterfaces MLIRSupport LLVMSupport
 )
 target_compile_options(toyc-ch4 PRIVATE -fno-rtti)
+
+# ==============================================================================
+# [Target 5] Chapter 5: partial lowering for optimization - Affine
+# ==============================================================================
+add_executable(toyc-ch5
+  toyc.cpp
+  parser/AST.cpp
+  lib/toy/MLIRGen.cpp
+  lib/toy/Dialect.cpp
+  lib/toy/ToyCombine.cpp 
+  lib/toy/ShapeInferencePass.cpp
+  lib/toy/LowerToAffineLoops.cpp
+)
+
+add_dependencies(toyc-ch5
+  ToyOpsIncGen
+  ToyCombineIncGen
+  ToyShapeInferenceIncGen
+)
+
+# CH5 매크로 정의
+target_compile_definitions(toyc-ch5 PRIVATE CH5)
+
+target_link_libraries(toyc-ch5 PRIVATE
+  MLIRIR MLIRParser MLIRPass MLIRTransforms MLIRAnalysis
+  MLIRSideEffectInterfaces MLIRCallInterfaces MLIRCastInterfaces
+  MLIRFunctionInterfaces MLIRSupport LLVMSupport
+  MLIRAffineDialect MLIRArithDialect MLIRFuncDialect MLIRMemRefDialect
+  MLIRAffineTransforms
+)
+target_compile_options(toyc-ch5 PRIVATE -fno-rtti)
