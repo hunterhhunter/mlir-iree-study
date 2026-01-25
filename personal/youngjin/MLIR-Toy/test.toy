@@ -33,4 +33,6 @@ def main() {
   var c = b * b;
   print(b);
   print(c);
+  print(a);
+  print(multiply_transpose(a, a));
 }

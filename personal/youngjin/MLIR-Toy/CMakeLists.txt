@@ -202,6 +202,78 @@ target_link_libraries(toyc-ch5 PRIVATE
   MLIRSideEffectInterfaces MLIRCallInterfaces MLIRCastInterfaces
   MLIRFunctionInterfaces MLIRSupport LLVMSupport
   MLIRAffineDialect MLIRArithDialect MLIRFuncDialect MLIRMemRefDialect
-  MLIRAffineTransforms
+  MLIRAffineTransforms MLIRFuncAllExtensions
 )
 target_compile_options(toyc-ch5 PRIVATE -fno-rtti)
+
+
+# ==============================================================================
+# [Target 6] Chapter 6: Lower to LLVM & JIT
+# ==============================================================================
+
+add_executable(toyc-ch6
+  toyc.cpp
+  parser/AST.cpp
+  lib/toy/MLIRGen.cpp
+  lib/toy/Dialect.cpp
+  lib/toy/ToyCombine.cpp 
+  lib/toy/ShapeInferencePass.cpp
+  lib/toy/LowerToAffineLoops.cpp
+  lib/toy/LowerToLLVM.cpp
+)
+
+add_dependencies(toyc-ch6
+  ToyOpsIncGen
+  ToyCombineIncGen
+  ToyShapeInferenceIncGen
+)
+
+# [중요] CH5와 CH6를 모두 정의해야 전체 파이프라인이 활성화됩니다!
+target_compile_definitions(toyc-ch6 PRIVATE CH5 CH6)
+
+target_link_libraries(toyc-ch6
+PRIVATE
+    # [1] 기본 MLIR 코어 & 인터페이스
+    MLIRAnalysis
+    MLIRIR
+    MLIRParser
+    MLIRPass
+    MLIRTransforms
+    MLIRSupport
+    MLIRSideEffectInterfaces
+    MLIRCallInterfaces
+    MLIRCastInterfaces
+    MLIRFunctionInterfaces
+
+    # [2] 하강(Lowering) 및 변환 패스 (CH5 필수)
+    MLIRAffineToStandard
+    MLIRSCFToControlFlow
+    MLIRArithToLLVM
+    MLIRFuncToLLVM
+    MLIRMemRefToLLVM
+    MLIRControlFlowToLLVM
+
+    # [3] LLVM Dialect 및 관련 기능
+    MLIRLLVMDialect
+    MLIRLLVMCommonConversion
+    MLIRLLVMIRTransforms  # <--- [중요] LLVM 인라이닝 인터페이스
+
+    # [4] LLVM IR 번역 (Translation)
+    MLIRTargetLLVMIRExport
+    MLIRLLVMToLLVMIRTranslation
+    MLIRBuiltinToLLVMIRTranslation
+
+    # [5] JIT 실행 엔진
+    MLIRExecutionEngine
+
+    # [6] 방언 및 확장 기능 (최신 버전 대응)
+    MLIRAffineDialect
+    MLIRArithDialect
+    MLIRFuncDialect
+    MLIRMemRefDialect
+    MLIRSCFDialect
+    MLIRControlFlowDialect
+    MLIRFuncAllExtensions # <--- [중요] Func 인라이닝 확장
+)
+
+target_compile_options(toyc-ch6 PRIVATE -fno-rtti)

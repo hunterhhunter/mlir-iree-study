@@ -1,4 +1,4 @@
-# 인라이닝 + 형태추론 워크플로우
+# MLIR Toy Tutorial Chapter 4: Inlining + Shape Inference
 
 ## 1. 인라이닝 패스
 1. generic_call 발견: InlinerPass가 IR을 스캔하다 generic_call 연산을 찾음
