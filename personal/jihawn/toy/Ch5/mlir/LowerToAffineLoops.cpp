@@ -48,55 +48,176 @@ using namespace mlir;
 
 /// 주어진 RankedTensorType을 해당하는 MemRefType으로 변환합니다.
 static MemRefType convertTensorToMemRef(RankedTensorType type) {
+  //type: 변환하고자 하는 원본 텐서 타입 (예: tensor<2x3xf64>)
+
+  // MemRefType::get(...) -> 새로운 MemRef 타입을 생성하는 MLIR API.
+  // 첫 번째 인자 type.getShape(): 원본 텐서의 모양(Shape) 정보를 그대로 가져옴. (예: [2, 3])
+  // 두 번째 인자 type.getElementType(): 원본 텐서 내부 요소의 타입(Element Type)을 그대로 가져옴. (예: f64)
   return MemRefType::get(type.getShape(), type.getElementType());
 }
 
 /// 주어진 MemRefType에 대한 할당 및 해제를 삽입합니다.
 static Value insertAllocAndDealloc(MemRefType type, Location loc,
                                    PatternRewriter &rewriter) {
+                                    // type: 할당할 메모리 참조의 타입 (예: memref<2x3xf64>)
+                                    // loc: 소스 코드 위치
+                                    // rewriter: 코드를 쓰고 지우는 도구
+
+  // 1. 할당 연산 생성
+  // memref::AllocOp::create(...) -> 지정된 type만큼 메모리를 할당하는 연산을 만듦.
   auto alloc = memref::AllocOp::create(rewriter, loc, type);
 
   // 블록의 시작 부분에 할당하도록 합니다.
-  auto *parentBlock = alloc->getBlock();
-  alloc->moveBefore(&parentBlock->front());
+  // 2. 할당 위치 조정(호이스팅)
+  // 할당은 루프 안에서 계속 일어나면 좋지 않기 때문에 현재 블록의 가장 위로 올림 
+  auto *parentBlock = alloc->getBlock(); // alloc연산이 속한 블록을 찾음
+  alloc->moveBefore(&parentBlock->front()); // 블록의 맨 앞(처음)으로 이동
 
   // 이 할당을 블록의 끝에서 해제하도록 합니다. Toy 함수들은 제어 흐름이 없으므로 괜찮습니다.
+  // 3. 해제 연산 생성 및 위치 조정
+  // 할당을 했으면 언제가 해제를 해야 메모리 누수가 발생하지 않음
   auto dealloc = memref::DeallocOp::create(rewriter, loc, alloc);
+
+  //Toy언어는 제어 흐름이 없는 함수형 언어이기 때문에
+  // 그냥 함수가 끝나기 전에 해제하면 안전
   dealloc->moveBefore(&parentBlock->back());
-  return alloc;
+
+  // 4. 할당된 메모리 값 반환
+  // 다른 연산들이 이 메모리를 사용할 수 있도록 할당된 메모리 참조 값을 반환
+  return alloc; //반환 값은 Value 타입(MLIR에서 SSA 값 표현)
 }
 
 /// 이것은 낮춰진 루프의 반복을 처리하는 데 사용되는 함수 타입을 정의합니다.
 /// 입력으로 OpBuilder와 반복을 위한 루프 유도 변수의 범위를 받습니다.
 /// 현재 반복 인덱스에 저장할 값을 반환합니다.
-using LoopIterationFn =
-    function_ref<Value(OpBuilder &rewriter, ValueRange loopIvs)>;
+// 텐서 연산을 아핀 루프로 바꿔주는 템플릿 같은 함수
 
+   /// 루프의 본문(Body)을 생성하는 콜백 함수의 타입 별칭.
+   /// 이 타입으로 전달되는 함수(람다 등)는 루프의 가장 안쪽에서 실행되며,
+   /// 구체적인 연산(로드, 계산 등)을 수행하고 그 결과를 반환해야 함.
+   //
+   // [LoopIterationFn 타입 정의]
+   // 타입: llvm::function_ref<Ret(Args...)> 
+   //       (함수 포인터, 람다 등을 가볍게 감싸는 참조자)
+   //
+   // - 반환값 (Value): 
+   //     루프 본문에서 계산된 최종 결과값(SSA Value). 
+   //     이 값은 이후 `lowerOpToLoops` 함수에서 메모리에 저장(Store).
+   //
+   // - 인자 1 (OpBuilder &rewriter): 
+   //     루프 내부에서 새로운 연산(Load, Add 등)을 생성하기 위한 빌더.
+   //     `OpBuilder`는 MLIR에서 "코드를 작성하는 펜(Pen)"이자 "커서(Cursor)" 
+   //
+   // - 인자 2 (ValueRange loopIvs): 
+   //     현재 루프의 인덱스 변수들(Induction Variables). (예: i, j...)
+   //     이 인덱스들을 사용하여 메모리 주소에 접근.
+using LoopIterationFn =
+    function_ref<Value(OpBuilder &rewriter, ValueRange loopIvs)>;  
+
+
+// [lowerOpToLoops 함수 설명]
+// 텐서 연산을 메모리 기반의 아핀 루프 형태로 변환하는 헬퍼 함수.
+//
+// [파라미터 상세 설명]
+// 1. Operation *op:
+//    - 변환 대상이 되는 원본 Toy 연산. (예: `toy.add`, `toy.transpose` 등)
+//    - 이 연산의 결과 타입(Tensor)을 분석하여, 생성할 루프의 범위(Shape)와 할당할 메모리 크기를 결정.
+//    - 타입: mlir::Operation* (모든 MLIR 연산의 기저 클래스 포인터)
+//
+// 2. PatternRewriter &rewriter:
+//    - MLIR의 패턴 매칭 및 변환 시스템에서 제공하는 도구.
+//    - 새로운 연산(AllocOp, AffineForOp 등)을 생성하거나, 기존 연산(op)을 삭제/대체하는 데 사용됨.
+//    - 타입: mlir::PatternRewriter& (OpBuilder를 상속받아 패턴 매칭 기능을 추가한 클래스)
+//
+// 3. LoopIterationFn processIteration:
+//    - 위에서 설명한 LoopIterationFn 타입의 콜백 함수.
 static void lowerOpToLoops(Operation *op, PatternRewriter &rewriter,
                            LoopIterationFn processIteration) {
-  auto tensorType = llvm::cast<RankedTensorType>((*op->result_type_begin()));
-  auto loc = op->getLoc();
 
-  // 이 연산의 결과에 대한 할당 및 해제를 삽입합니다.
+  // 1. 결과 타입 분석
+  // 원본 연산의 첫번째 결과값의 타입을 가져옴
+  // Toy 언어에선 모든 연산이 RankedTensorType이라고 가정
+  // llvm::cast<T>(val): val을 T 타입으로 캐스팅
+  auto tensorType = llvm::cast<RankedTensorType>((*op->result_type_begin()));
+  auto loc = op->getLoc(); // 디버깅 및 오류 보고를 위한 위치 정보
+
+  // 2. 메모리 할당
+  // 텐서 타입을 메모리 타입으로 변환
   auto memRefType = convertTensorToMemRef(tensorType);
+
+  // 변환된 타입에 맞춰 메모리를 할당하고, 나중에 해제를 하는 코드를 삽입
+  // `alloc` 변수는 할당된 메모리 공간을 가리키는 `Value`
+  // 반환값 타입: mlir::Value (SSA 값을 표현하는 클래스)
   auto alloc = insertAllocAndDealloc(memRefType, loc, rewriter);
+
+  // 3. 루프 범위 설정: 텐서의 Rank만큼 중첩된 LoopNest를 생성해야 함
 
   // 모양의 차원당 하나의 루프를 갖는 아핀 루프의 중첩을 생성합니다.
   // buildAffineLoopNest 함수는 빌더, 위치 및 루프 유도 변수의 범위가 주어졌을 때
   // 가장 안쪽 루프의 본문을 구성하는 데 사용되는 콜백을 받습니다.
+
+  // `lowerBounds`: 각 차원의 루프 시작 인덱스 (모두 0으로 초기화)
+  // 예: 2차원 텐서라면 `[0, 0]`
+  // 타입: llvm::SmallVector<int64_t, 4> (작은 크기일 때 힙 할당을 피하는 벡터)
   SmallVector<int64_t, 4> lowerBounds(tensorType.getRank(), /*Value=*/0);
+
+
+  // `steps`: 각 차원의 루프 증가폭(Step) (모두 1로 초기화)
+  // 예: 2차원 텐서라면 `[1, 1]`
+  // 타입: llvm::SmallVector<int64_t, 4>
   SmallVector<int64_t, 4> steps(tensorType.getRank(), /*Value=*/1);
+
+
+  // 4. 아핀 루프 중첩 생성
+  // `affine::buildAffineLoopNest` 함수를 사용하여 다차원 루프를 한 번에 생성
+  // - 인자 설명:
+  //   1. rewriter: 연산 생성 도구 (mlir::OpBuilder&)
+  //   2. loc: 위치 정보 (mlir::Location)
+  //   3. lowerBounds: 루프 시작값 배열 (ArrayRef<int64_t>)
+  //   4. tensorType.getShape(): 루프 종료값 배열 (ArrayRef<int64_t>)
+  //   5. steps: 루프 증가폭 배열 (ArrayRef<int64_t>)
+  //   6. 람다 함수: 루프의 가장 안쪽 본문(Body)을 채우는 콜백
   affine::buildAffineLoopNest(
       rewriter, loc, lowerBounds, tensorType.getShape(), steps,
       [&](OpBuilder &nestedBuilder, Location loc, ValueRange ivs) {
         // 리라이터와 루프 유도 변수들로 처리 함수를 호출합니다. 이 함수는
         // 현재 인덱스에 저장할 값을 반환할 것입니다.
+
+
+
+
+      // [람다 함수 내부 (Loop Body)]
+      // 이 람다 함수는 루프의 가장 안쪽에서 실행됨.
+        //
+        // - OpBuilder &nestedBuilder: 루프 본문 안에서 연산을 생성할 때 사용하는 빌더. (rewriter와 유사)
+        // - ValueRange ivs: 현재 루프의 인덱스 변수들. (예: `[i, j]`)
+        //   타입: mlir::ValueRange (mlir::Value들의 뷰(View))
+  
+        // 4-1. 실제 연산 수행 (processIteration 호출)
+        // 사용자가 전달한 콜백 함수(`processIteration`)를 호출하여, 이 위치(`ivs`)에 들어갈 값을 계산.
+        // `valueToStore`는 계산된 결과값(Value).
+        // processIteration 호출 시:
+        //  - nestedBuilder: 현재 루프 바디용 빌더
+        //  - ivs: 현재 인덱스들
         Value valueToStore = processIteration(nestedBuilder, ivs);
+
+
+        // 4-2. 결과값 저장 (Store)
+        // 계산된 값(`valueToStore`)을 위에서 할당한 메모리(`alloc`)의 해당 위치(`ivs`)에 저장.
+        // `affine.store` 연산을 생성.
+        // 매개변수:
+        //  - nestedBuilder: 빌더
+        //  - loc: 위치 정보
+        //  - valueToStore: 저장할 값 (Value)
+        //  - alloc: 대상 메모리 버퍼 (Value)
+        //  - ivs: 저장할 위치 인덱스들 (ValueRange)
         affine::AffineStoreOp::create(nestedBuilder, loc, valueToStore, alloc,
                                       ivs);
       });
 
-  // 이 연산을 생성된 할당으로 대체합니다.
+  // 5. 원본 연산 대체
+  // 이제 원본 텐서 연산 op는 필요 없으므로, 새로 만든 메모리 할당(alloc)으로 대체
+  // 이후 MLIR 프레임워크가 원본 연산을 제거함
   rewriter.replaceOp(op, alloc);
 }
 
@@ -338,13 +459,13 @@ void ToyToAffineLoweringPass::runOnOperation() {
   // 이 줄 덕분에 컴파일러는 어떻게든 Toy 연산을 찾아서 다른 걸로 바꾸려고 시도하게 됨
   target.addIllegalDialect<toy::ToyDialect>();
 
-  //동적 합법: 람다 함수 [](toy::PrintOp op) { ... }가 true를 반화하면 합법, false면 불법
-  target.addDynamicallyLegalOp<toy::PrintOp>([](toy::PrintOp op) {
     return llvm::none_of(op->getOperandTypes(), //print 연산에 들어오는 피연산자 타입들 중에
                          [](Type type) { return llvm::isa<TensorType>(type); }); //TensorType이 하나라도 있으면 false 반환(불법), 없으면 true 반환(합법)
   });
 
-  // 이제 변환 대상이 정의되었으므로, Toy 연산들을 낮출 패턴 집합을 제공하기만 하면 됩니다.
+  // 이제 변환 대상이 정의되었으므로, Toy 연산들을 낮출 패턴 집합을 제공하기만
+  //동적 합법: 람다 함수 [](toy::PrintOp op) { ... }가 true를 반화하면 합법, false면 불법
+  target.addDynamicallyLegalOp<toy::PrintOp>([](toy::PrintOp op) { 하면 됩니다.
   // 불법 연산들을 합법 연산으로 어떻게 바꿀지를 담은 패턴 묶음을 만들기
   RewritePatternSet patterns(&getContext());
   patterns.add<AddOpLowering, ConstantOpLowering, FuncOpLowering, MulOpLowering,
