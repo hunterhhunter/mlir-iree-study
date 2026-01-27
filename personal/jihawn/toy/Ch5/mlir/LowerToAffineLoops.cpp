@@ -226,28 +226,61 @@ namespace {
 // ToyToAffine 변환 패턴: 이진 연산
 //===----------------------------------------------------------------------===//
 
+/// BinaryOpLowering은 Toy의 이진 연산(Add, Mul)을 Affine 루프 기반의 연산으로 변환하는 공통 템플릿.
+///
+/// [템플릿 파라미터 설명]
+/// 1. BinaryOp: 변환 대상인 Toy 다열렉트 연산 클래스. (예: toy::AddOp, toy::MulOp)
+/// 2. LoweredBinaryOp: 변환 후에 생성될 표준 다열렉트 연산 클래스. (예: arith::AddFOp, arith::MulFOp)
 template <typename BinaryOp, typename LoweredBinaryOp>
 struct BinaryOpLowering : public OpConversionPattern<BinaryOp> {
+  // 부모 클래스인 OpConversionPattern의 생성자를 그대로 사용.
   using OpConversionPattern<BinaryOp>::OpConversionPattern;
+
+  // OpAdaptor는 변환된 피연산자(Operand)들에 접근하기 위한 래퍼 클래스.
+  // Toy 연산의 피연산자는 원래 Tensor 타입이지만, 이 adaptor를 통해 가져오는 피연산자는
+  // 이미 MemRef 타입으로 변환된 상태.
   using OpAdaptor = typename OpConversionPattern<BinaryOp>::OpAdaptor;
 
-  LogicalResult
+  /// 실제 변환 로직을 수행하는 함수.
+  /// 
+  /// [파라미터 타입 설명]
+  /// - BinaryOp op: 변환되기 전의 원본 Toy 연산 인스턴스. (메타데이터 접근용)
+  /// - OpAdaptor adaptor: 변환된(Remapped) 피연산자들에 접근할 수 있는 객체.
+  /// - ConversionPatternRewriter &rewriter: IR을 수정(생성/삭제/대체)하는 빌더.
+  LogicalResult //LogicalResult: 성공/실패를 나타내는 MLIR의 표준 반환 타입
   matchAndRewrite(BinaryOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const final {
     auto loc = op->getLoc();
+
+    // lowerOpToLoops 헬퍼 함수를 사용하여 루프 구조를 생성.
+    // 이 헬퍼 함수는 내부적으로 메모리 할당(Alloc)과 루프 중첩(BuildAffineLoopNest)을 수행.
     lowerOpToLoops(op, rewriter, [&](OpBuilder &builder, ValueRange loopIvs) {
-      // 내부 루프에서 'lhs'와 'rhs'의 요소에 대한 로드를 생성합니다.
+      // [루프 본문(Body) 로직 시작]
+      // builder: 루프 내부에서 연산을 생성할 빌더
+      // loopIvs: 현재 루프의 인덱스들 (예: [i, j])
+
+      // 1. 내부 루프에서 'lhs'와 'rhs'의 요소에 대한 로드를 생성.
+      // adaptor.getLhs()와 getRhs()는 이미 MemRef가 된 입력값들을 반환.
+      // affine::AffineLoadOp::create를 통해 특정 인덱스(loopIvs)의 값을 메모리에서 읽어옴.
       auto loadedLhs =
           affine::AffineLoadOp::create(builder, loc, adaptor.getLhs(), loopIvs);
       auto loadedRhs =
           affine::AffineLoadOp::create(builder, loc, adaptor.getRhs(), loopIvs);
 
-      // 로드된 값들에 대해 수행되는 이진 연산을 생성합니다.
+      // 2. 로드된 값들에 대해 실제 이진 연산(AddF, MulF 등)을 수행.
+      // LoweredBinaryOp::create는 템플릿 인자로 받은 연산(예: arith::AddFOp)을 생성.
+      // 계산된 결과값(Value)을 반환하면, lowerOpToLoops 헬퍼가 이를 메모리에 저장(Store).
       return LoweredBinaryOp::create(builder, loc, loadedLhs, loadedRhs);
     });
-    return success();
+
+    return success(); // 변환이 성공했음을 나타냄
   }
 };
+
+//템플릿을 사용하여 Toy의 AddOp와 MulOp에 대한 구체적인 변환 패턴을 정의.
+// AddOpLowering: toy::AddOp를 arith::AddFOp로 변환
+// MulOpLowering: toy::MulOp를 arith::MulFOp로 변환
+// 덧셈, 곱셈 연산은 동일한 로직을 따르므로 템플릿으로 재사용
 using AddOpLowering = BinaryOpLowering<toy::AddOp, arith::AddFOp>;
 using MulOpLowering = BinaryOpLowering<toy::MulOp, arith::MulFOp>;
 
