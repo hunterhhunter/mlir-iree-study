@@ -35,6 +35,7 @@
 using namespace mlir;
 
 namespace {
+    // 26.01.26 - PrintOpLowering
     class PrintOpLowering : public OpConversionPattern<toy::PrintOp> {
     public:
         using OpConversionPattern<toy::PrintOp>::OpConversionPattern;
@@ -42,6 +43,7 @@ namespace {
         LogicalResult
         matchAndRewrite(toy::PrintOp op, OpAdaptor adaptor,
                         ConversionPatternRewriter &rewriter) const override {
+            // 피연산자(memRef) 분석 - Shape, type
             auto *context = rewriter.getContext();
             auto memRefType = llvm::cast<MemRefType>((*op->operand_type_begin()));
             auto memRefShape = memRefType.getShape();
@@ -49,35 +51,58 @@ namespace {
 
             ModuleOp parentModule = op->getParentOfType<ModuleOp>();
 
+            // printf 외부 함수 준비
             auto printfRef = getOrInsertPrintf(rewriter, parentModule);
+            // 숫자를 출력할 때 필요한 %f를 전역 공간에 선언 후 주소를 보유
             Value formatSpecifierCst = getOrCreateGlobalString(
                 loc, rewriter, "frmt_spec", StringRef("%f \0", 4), parentModule);
+            // 줄바꿈 문자를 전역 공간에 선언 후 주소를 보유
             Value newLineCst = getOrCreateGlobalString(
                 loc, rewriter, "nl", StringRef("\n\0", 2), parentModule);
 
+            // for loop를 통해 중첩된 텐서를 출력
             SmallVector<Value, 4> loopIvs;
             for (unsigned i = 0, e = memRefShape.size(); i != e; ++i) {
+                // 루프 제어 상수 정의 (0 -> memRef 차원, Step: 1)
                 auto lowerBound = arith::ConstantIndexOp::create(rewriter, loc, 0);
                 auto upperBound = 
                     arith::ConstantIndexOp::create(rewriter, loc, memRefShape[i]);
                 auto step = arith::ConstantIndexOp::create(rewriter, loc, 1);
+
+                // 1. Structured Control Flow (SCF) 다이얼렉트의 루프 연산 생성
                 auto loop = 
                     scf::ForOp::create(rewriter, loc, lowerBound, upperBound, step);
+
+                // 2. 생성된 루프 내부의 기본 블록(Body) 초기화
+                // 새로 생성된 루프 본문에 기본적으로 포함된 연산들을 제거하여 깨끗한 상태로 만듦   
                 for (Operation &nested : make_early_inc_range(*loop.getBody()))
                     rewriter.eraseOp(&nested);
+
+                // 3. 현재 차원의 루프 인덱스 변수(IV)를 수집하여 인덱싱 좌표로 활용
                 loopIvs.push_back(loop.getInductionVar());
 
+                // 4. 핵심: Insertion Point(삽입 지점) 이동
+                // 다음 루프(i+1)가 현재 루프(i)의 내부(Body)에 생성되도록 빌더의 위치를 루프 안으로 옮김
                 rewriter.setInsertionPointToEnd(loop.getBody());
 
+                // 5. 행 바꿈(Newline) 제어 로직
+                // 최하위(Innermost) 루프가 아닌 경우, 내부 루프가 종료된 시점에 줄바꿈 printf를 삽입
+                // 행렬을 2차원 이상의 시각적 구조로 출력하기 위함
                 if (i != e -1)
                     LLVM::CallOp::create(rewriter, loc, getPrintfType(context), printfRef,
                                             newLineCst);
+                                            
+                // 6. 루프의 끝을 알리는 Yield 연산 생성 (Terminator)
                 scf::YieldOp::create(rewriter, loc);
+                // 7. 다음 차원의 요소들이 루프의 시작 부분부터 배치될 수 있도록 삽입 지점 재조정
                 rewriter.setInsertionPointToStart(loop.getBody());
             }
 
+            // 루프의 가장 안쪽에 이 Op가 삽입됨.
+            // 현재 루프의 인덱스들(loopIvs)을 좌표로 실제 값을 하나 꺼냄
             auto elementLoad = 
                 memref::LoadOp::create(rewriter, loc, op.getInput(), loopIvs);
+            // 꺼낸 값과 "%f "주소를 가지고 printf를 호출
             LLVM::CallOp::create(rewriter, loc, getPrintfType(context), printfRef,
                                  ArrayRef<Value>({formatSpecifierCst, elementLoad}));
             

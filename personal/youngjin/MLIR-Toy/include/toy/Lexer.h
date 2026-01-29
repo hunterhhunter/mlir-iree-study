@@ -1,3 +1,15 @@
+//===- Lexer.h - Lexer for the Toy language -------------------------------===//
+//
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
+// This file implements a simple Lexer for the Toy language.
+//
+//===----------------------------------------------------------------------===//
+
 #ifndef TOY_LEXER_H
 #define TOY_LEXER_H
 
@@ -33,18 +45,25 @@ enum Token : int {
   tok_return = -2,
   tok_var = -3,
   tok_def = -4,
+  tok_struct = -5,
 
   // primary
-  tok_identifier = -5,
-  tok_number = -6,
+  tok_identifier = -6,
+  tok_number = -7,
 };
 
+/// The Lexer is an abstract base class providing all the facilities that the
+/// Parser expects. It goes through the stream one token at a time and keeps
+/// track of the location in the file for debugging purpose.
+/// It relies on a subclass to provide a `readNextLine()` method. The subclass
+/// can proceed by reading the next line from the standard input or from a
+/// memory mapped file.
 // lexer는 parser의 기댓값을 모두 제공하는 추상화 기반 클래스
 // 스트림을 토큰단위로 처리하고 디버깅을 위해 파일의 위치를 추적
 class Lexer {
 public:
   /// Create a lexer for the given filename. The filename is kept only for
-  /// debugging purposes (attaching a location to a Token).
+  /// debugging purpose (attaching a location to a Token).
   Lexer(std::string filename)
       : lastLocation(
             {std::make_shared<std::string>(std::move(filename)), 0, 0}) {}
@@ -101,19 +120,11 @@ private:
     // 현재 문자열이 없을 경우 EOF
     if (curLineBuffer.empty())
       return EOF;
-    
-    // 다음 문자로
     ++curCol;
-    
-    // 다음 문자 저장 및 drop
     auto nextchar = curLineBuffer.front();
     curLineBuffer = curLineBuffer.drop_front();
-    
-    // 다 읽었을 경우 다음줄 요청
     if (curLineBuffer.empty())
       curLineBuffer = readNextLine();
-    
-    // 다음 문자가 줄넘김일 경우 줄 수 올림
     if (nextchar == '\n') {
       ++curLineNum;
       curCol = 0;
@@ -142,13 +153,15 @@ private:
         return tok_return;
       if (identifierStr == "def")
         return tok_def;
+      if (identifierStr == "struct")
+        return tok_struct;
       if (identifierStr == "var")
         return tok_var;
       return tok_identifier;
     }
 
-    // Number: [0-9.]+
-    if (isdigit(lastChar) || lastChar == '.') {
+    // Number: [0-9] ([0-9.])*
+    if (isdigit(lastChar)) {
       std::string numStr;
       do {
         numStr += lastChar;

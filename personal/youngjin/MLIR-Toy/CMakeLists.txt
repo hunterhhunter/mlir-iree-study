@@ -277,3 +277,57 @@ PRIVATE
 )
 
 target_compile_options(toyc-ch6 PRIVATE -fno-rtti)
+
+# ==============================================================================
+# [Target 7] Chapter 7: Struct Support & Advanced Optimizations
+# ==============================================================================
+
+add_executable(toyc-ch7
+  toyc.cpp
+  parser/AST.cpp
+  lib/toy/MLIRGen.cpp
+  lib/toy/Dialect.cpp
+  lib/toy/ToyCombine.cpp 
+  lib/toy/ShapeInferencePass.cpp
+  lib/toy/LowerToAffineLoops.cpp
+  lib/toy/LowerToLLVM.cpp
+)
+
+add_dependencies(toyc-ch7
+  ToyOpsIncGen
+  ToyCombineIncGen
+  ToyShapeInferenceIncGen
+)
+
+# CH7 매크로 정의 (이전 챕터들의 기능도 포함)
+target_compile_definitions(toyc-ch7 PRIVATE CH5 CH6 CH7)
+
+target_link_libraries(toyc-ch7
+  PRIVATE
+    # Base MLIR
+    MLIRIR MLIRParser MLIRPass MLIRTransforms MLIRAnalysis
+    MLIRSupport LLVMSupport MLIRSideEffectInterfaces
+    MLIRCallInterfaces MLIRCastInterfaces MLIRFunctionInterfaces
+
+    # Dialects & Extensions (최신 버전 대응)
+    MLIRAffineDialect MLIRArithDialect MLIRFuncDialect MLIRMemRefDialect 
+    MLIRLLVMDialect MLIRSCFDialect MLIRControlFlowDialect
+    MLIRFuncAllExtensions   # <--- [중요] 7장 인라이닝 필수
+    MLIRLLVMIRTransforms    # <--- [중요] 7장 LLVM 패스 필수
+
+    # Lowering Passes
+    MLIRAffineToStandard
+    MLIRSCFToControlFlow
+    MLIRArithToLLVM
+    MLIRFuncToLLVM
+    MLIRMemRefToLLVM
+    MLIRControlFlowToLLVM
+
+    # Export & JIT
+    MLIRTargetLLVMIRExport
+    MLIRLLVMToLLVMIRTranslation
+    MLIRBuiltinToLLVMIRTranslation
+    MLIRExecutionEngine
+)
+
+target_compile_options(toyc-ch7 PRIVATE -fno-rtti)

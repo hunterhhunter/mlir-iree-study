@@ -36,12 +36,11 @@ using namespace mlir;
 //===----------------------------------------------------------------------===//
 
 /// Convert the given RankedTensorType into the corresponding MemRefType
-/// 텐서->MemRef로 타입만 바꾸는 함수임.
+/// 텐서->MemRef로 타입만 바꾸는 함수
 struct MemRefType convertTensorToMemRef(RankedTensorType type) {
     return MemRefType::get(type.getShape(), type.getElementType());
 }
 
-// Insert an allocation and deallocation for the given MemrefType.
 static Value insertAllocAndDealloc(MemRefType type, Location loc,
                                    PatternRewriter &rewriter) {
     auto alloc = memref::AllocOp::create(rewriter, loc, type);
@@ -54,6 +53,7 @@ static Value insertAllocAndDealloc(MemRefType type, Location loc,
     // toy 함수들이 제어 흐름을 가지고 있지 않아서 괜찮음.
     auto dealloc = memref::DeallocOp::create(rewriter, loc, alloc);
     dealloc->moveBefore(&parentBlock->back());
+    // 할당된 메모리 블록의 시작점 반환
     return alloc;
 }
 
@@ -62,22 +62,30 @@ using LoopIterationFn =
 
 static void lowerOpToLoops(Operation *op, PatternRewriter &rewriter,
                            LoopIterationFn precessIteration) {
+    // 텐서 타입 -> 메모리 타입
     auto tensorType = llvm::cast<RankedTensorType>((*op->result_type_begin()));
     auto loc = op->getLoc();
-
-    // Insert an Allocation and Deallocation for the result of this operation
     auto memRefType = convertTensorToMemRef(tensorType);
+    // 생성자 소멸자 삽입 (메모리 수명 주기 관리)
     auto alloc = insertAllocAndDealloc(memRefType, loc, rewriter);
 
+    // 텐서 shape으로 반복문 크기 설정
     SmallVector<int64_t, 4> lowerBounds(tensorType.getRank(), /*Value=*/0);
     SmallVector<int64_t, 4> steps(tensorType.getRank(), /*Value=*/1);
+    
+    // 텐서 차원 수에 맞춰 자동 루프 생성 - buildAffineLoopNest가 자동으로 관리
     affine::buildAffineLoopNest(
         rewriter, loc, lowerBounds, tensorType.getShape(), steps,
+        // nestedBuilder는 buildAffineLoopNest 함수가 전달
+        // rewriter는 loop가 들어가야하는 위치(시작)을 가리키지만 안에 연산을 주입하기 위해서는 
+        // loop안쪽을 가리키는 객체가 필요함 == nestedBuilder
         [&](OpBuilder &nestedBuilder, Location loc, ValueRange ivs) {
+            // 이 함수를 호출한 측에서 전달한 람다 함수가 여기서 실행되어
+            // Value(Op가 1개일 경우 Value(SSA값)로 자동 형변환됨)의 형태로 전달이 됨.
             Value valueToStore = precessIteration(nestedBuilder, ivs);
             affine::AffineStoreOp::create(nestedBuilder, loc, valueToStore, alloc,
                                           ivs);
-        });
+    });
 
     rewriter.replaceOp(op, alloc);
 }
@@ -209,6 +217,7 @@ struct ConstantOpLowering : public OpConversionPattern<toy::ConstantOp> {
 //                 arith::ConstantIndexOp::create(rewriter, loc, 0));
 //         }
 
+//         // 26.01.26 - 재귀를 이용한 문제 해결(텐서)
 //         // 실제 memRef에 상수값을 저장하는 로직
 //         // 2차원을 넘어가면 heap에 할당
 //         SmallVector<Value, 2> indices;
@@ -347,9 +356,8 @@ struct ToyToAffineLoweringPass
     void runOnOperation() final;
 };
 } // namespace
-
+// 첫 단계는 변환 대상을 정의하는 것. 이는 최종 lowering 대상을 정의하는 것
 void ToyToAffineLoweringPass::runOnOperation() {
-    // 첫 단계는 변환 대상을 정의하는 것. 이는 최종 lowering 대상을 정의하는 것
     ConversionTarget target(getContext());
 
     // lowering에 적합한 특정 연산, 방언을 정의한다.
@@ -380,3 +388,5 @@ void ToyToAffineLoweringPass::runOnOperation() {
 std::unique_ptr<Pass> mlir::toy::createLowerToAffinePass() {
     return std::make_unique<ToyToAffineLoweringPass>();
 }
+
+

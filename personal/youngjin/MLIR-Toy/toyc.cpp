@@ -263,7 +263,7 @@ static int dumpMLIR() {
   mlir::DialectRegistry registry;
   registry.insert<mlir::toy::ToyDialect>();
 
-#ifdef CH5
+#if defined(CH5) || defined(CH6) || defined(CH7)
   // CH5에서는 Affine, Arith, Func, MemRef 다이얼렉트가 필요함
   // 인라이닝 동작을 위한 등록 
   mlir::func::registerAllExtensions(registry);
@@ -273,7 +273,8 @@ static int dumpMLIR() {
                   mlir::arith::ArithDialect, 
                   mlir::func::FuncDialect>();
 #endif
-#ifdef CH6
+
+#if defined(CH6) || defined(CH7)
   registry.insert<mlir::LLVM::LLVMDialect>();
   mlir::LLVM::registerInlinerInterface(registry);
 #endif
@@ -289,19 +290,19 @@ static int dumpMLIR() {
     return error;
 
   // [변경] 최적화 및 하강 로직 수행 (CH3, CH4, CH5)
-#if defined (CH3) || defined (CH4) || defined (CH5) || defined(CH6)
+#if defined(CH3) || defined(CH4) || defined(CH5) || defined(CH6) || defined(CH7)
   mlir::PassManager pm(module.get()->getName());
   if (mlir::failed(mlir::applyPassManagerCLOptions(pm)))
     return 4;
 
   // [CH5] Affine Lowering 여부 확인
   bool isLoweringToAffine = false;
-#ifdef CH5
+#if defined(CH5) || defined(CH6) || defined(CH7)
   isLoweringToAffine = emitAction >= Action::DumpMLIRAffine;
 #endif
 
 // Ch6 LLVM 
-#ifdef CH6
+#if defined(CH6) || defined(CH7)
   // LLVM으로 가거나 JIT를 하려면 당연히 Affine 하강이 선행되어야 함
   bool isLoweringToLLVM = emitAction >= Action::DumpMLIRLLVM;
   isLoweringToAffine |= isLoweringToLLVM;
@@ -311,7 +312,7 @@ static int dumpMLIR() {
   // 먼저 Toy 레벨의 최적화(Inlining, Shape Inference)가 선행되어야 합니다.
   // Shape Inference가 되어야 텐서 크기를 알고 메모리를 할당할 수 있기 때문입니다.
   if (enableOpt || isLoweringToAffine) {
-    #if defined(CH4) || defined(CH5) || defined(CH6)
+    #if defined(CH4) || defined(CH5) || defined(CH6) || defined(CH7)
     // 1. 인라이닝 수행
     pm.addPass(mlir::createInlinerPass());
     
@@ -324,7 +325,7 @@ static int dumpMLIR() {
     #endif
   }
 
-#ifdef CH5
+#if defined(CH5) || defined(CH6) || defined(CH7)
   if (isLoweringToAffine) {
     // 3. Toy -> Affine 부분 하강 수행
     pm.addPass(mlir::toy::createLowerToAffinePass());
@@ -343,10 +344,18 @@ static int dumpMLIR() {
     }
   }
 #endif
+
 // CH6 LLVm Lowering Pass 추가
-#ifdef CH6
+#if defined(CH6) || defined(CH7)
   if (isLoweringToLLVM) {
     pm.addPass(mlir::toy::createLowerToLLVMPass());
+
+    // [Chapter 7 추가] 디버그 정보(Line Table) 생성을 위한 DIScope 패스
+    // 이 패스는 LLVM Dialect 내의 함수들에 디버그 범위를 지정하여
+    // 나중에 JIT나 디버거에서 소스 위치를 추적할 수 있게 돕습니다.
+    #ifdef CH7
+    pm.addPass(mlir::LLVM::createDIScopeForLLVMFuncOpPass());
+    #endif
   }
 #endif
 
@@ -355,7 +364,7 @@ static int dumpMLIR() {
     return 4;
 #endif // End of Optimization Block
 
-#ifdef CH6
+#if defined(CH6) || defined(CH7)
   if (emitAction == Action::DumpLLVMIR)
     return dumpLLVMIR(*module);
   if (emitAction == Action::RunJIT)

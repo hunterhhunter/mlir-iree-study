@@ -1,38 +1,9 @@
-# User defined generic function that operates on unknown shaped arguments.
-def multiply_transpose(a, b) {
-  return transpose(a) * transpose(b);
-}
-
-# ch3 optimize transpose using C++ style pattern-match and rewrite
-def transpose_transpose(x) {
-  return transpose(transpose(x));
-}
-
-# ch3 reshape test
-#  toy.func @reshape_test(%arg0: tensor<*xf64>) {
-#    %0 = toy.constant dense<[[1.000000e+00, 2.000000e+00, 3.000000e+00], [4.000000e+00, 5.000000e+00, 6.000000e+00]]> : tensor<2x3xf64>
-#    %1 = toy.generic_call @reshape(%0) : (tensor<2x3xf64>) -> tensor<*xf64>
-#    %2 = toy.reshape(%1 : tensor<*xf64>) to tensor<3x2xf64>
-#    %3 = toy.constant dense<[[1.000000e+00, 2.000000e+00, 3.000000e+00], [4.000000e+00, 5.000000e+00, 6.000000e+00]]> : tensor<2x3xf64>
-#    %4 = toy.generic_call @reshape(%3) : (tensor<2x3xf64>) -> tensor<*xf64>
-#    %5 = toy.reshape(%4 : tensor<*xf64>) to tensor<2x3xf64>
-#    toy.return
-#  }
-# ch3에서는 reshape과정에서 상수폴딩을 하려 했으나 이 코드에서는 generic_call로 인해
-# 상수폴딩이 일어나지 않는 모습을 볼 수 있음.
-def reshape_test(x) {
-  var a<2,1> = [1, 2];
-  var b<2,1> = a;
-  var c<2,1> = b;
-  print(c);
+struct Struct {
+  var a;
+  var b;
 }
 
 def main() {
-  var a = [[1, 2, 3], [4, 5, 6]];
-  var b = transpose(a);
-  var c = b * b;
-  print(b);
-  print(c);
-  print(a);
-  print(multiply_transpose(a, a));
+  Struct value = { [1, 2, 3], [4, 5, 6] };
+  print(value);
 }

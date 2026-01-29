@@ -11,6 +11,23 @@ namespace {
     #include "toy/ToyCombine.inc"
 } // namespace
 
+/// Fold constants.
+OpFoldResult ConstantOp::fold(FoldAdaptor adaptor) { return getValue(); }
+
+/// Fold struct constants.
+OpFoldResult StructConstantOp::fold(FoldAdaptor adaptor) { return getValue(); }
+
+/// Fold simple struct access operations that access into a constant.
+OpFoldResult StructAccessOp::fold(FoldAdaptor adaptor) {
+  auto structAttr =
+      llvm::dyn_cast_if_present<mlir::ArrayAttr>(adaptor.getInput());
+  if (!structAttr)
+    return nullptr;
+
+  size_t elementIndex = getIndex();
+  return structAttr[elementIndex];
+}
+
 /// TransposeOp를 C++ 스타일로 재작성패턴 정의
 struct SimplifyRedundantTranspose : public mlir::OpRewritePattern<TransposeOp> {
     // 여기 적는 패턴은 모든 toy 언어에 적용됨
