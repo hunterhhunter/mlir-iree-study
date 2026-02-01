@@ -270,8 +270,16 @@ def PrintOp : Toy_Op<"print"> {
     no results.
   }];
 
-  // The print operation takes an input tensor to print.
-  // We also allow a F64MemRef to enable interop during partial lowering.
+  // print 연산은 출력할 입력 텐서를 인자로 받음.
+  // 또한, 부분 낮추기(Partial Lowering) 과정에서 텐서와 멤레프 간의 상호운용성을 지원하기 위해
+  // F64MemRef 타입도 허용하도록 설정.
+  //
+  // [타입 및 문법 설명]
+  // - F64Tensor: 64비트 부동소수점(double)을 요소로 갖는 텐서 타입. (값 의미론, Value Semantics)
+  // - F64MemRef: 64비트 부동소수점(double)을 요소로 갖는 메모리 버퍼 타입. (참조 의미론, Reference Semantics)
+  // - AnyTypeOf<[A, B]>: 입력 인자($input)가 A 타입이거나 B 타입일 수 있음을 의미.
+  //   이 설정을 통해 컴파일러는 이 연산이 Tensor를 가지고 있든, 변환된 MemRef를 가지고 있든
+  //   문법적으로 올바른 상태로 인식하게 됨.
   let arguments = (ins AnyTypeOf<[F64Tensor, F64MemRef]>:$input);
 
   let assemblyFormat = "$input attr-dict `:` type($input)";

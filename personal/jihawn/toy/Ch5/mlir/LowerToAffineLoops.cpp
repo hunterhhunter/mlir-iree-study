@@ -485,20 +485,21 @@ void ToyToAffineLoweringPass::runOnOperation() {
                          memref::MemRefDialect>(); //memref: 메모리 참조 연산들
 
   // 또한 Toy 다열렉트를 불법(Illegal)으로 정의하여 이러한 연산들 중 하나라도 변환되지 않으면
-  // 변환이 실패하도록 합니다. 사실 우리는 부분적인 낮추기를 원하므로,
+  // 변환이 실패하도록 합니다. 
+  target.addIllegalDialect<toy::ToyDialect>();
+
+  // 사실 우리는 부분적인 낮추기를 원하므로,
   // 낮추기를 원하지 않는 Toy 연산인 'toy.print'를 명시적으로 '합법(legal)'으로 표시합니다.
   // 하지만 'toy.print'는 (TensorType에서 MemRefType으로 변환함에 따라) 피연산자들이
   // 업데이트되어야 하므로, 피연산자들이 합법일 경우에만 그것을 '합법'으로 취급합니다.
   // 이 줄 덕분에 컴파일러는 어떻게든 Toy 연산을 찾아서 다른 걸로 바꾸려고 시도하게 됨
-  target.addIllegalDialect<toy::ToyDialect>();
-
-    return llvm::none_of(op->getOperandTypes(), //print 연산에 들어오는 피연산자 타입들 중에
+  //동적 합법: 람다 함수 [](toy::PrintOp op) { ... }가 true를 반화하면 합법, false면 불법
+  target.addDynamicallyLegalOp<toy::PrintOp>([](toy::PrintOp op) {
+    return llvm::none_of(op->getOperandTypes(), // print 연산에 들어오는 피연산자 타입들 중에
                          [](Type type) { return llvm::isa<TensorType>(type); }); //TensorType이 하나라도 있으면 false 반환(불법), 없으면 true 반환(합법)
   });
 
-  // 이제 변환 대상이 정의되었으므로, Toy 연산들을 낮출 패턴 집합을 제공하기만
-  //동적 합법: 람다 함수 [](toy::PrintOp op) { ... }가 true를 반화하면 합법, false면 불법
-  target.addDynamicallyLegalOp<toy::PrintOp>([](toy::PrintOp op) { 하면 됩니다.
+  // 이제 변환 대상이 정의되었으므로, Toy 연산들을 낮출 패턴 집합을 제공하기만 하면 됩니다.
   // 불법 연산들을 합법 연산으로 어떻게 바꿀지를 담은 패턴 묶음을 만들기
   RewritePatternSet patterns(&getContext());
   patterns.add<AddOpLowering, ConstantOpLowering, FuncOpLowering, MulOpLowering,
