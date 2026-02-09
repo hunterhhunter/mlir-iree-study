@@ -132,7 +132,7 @@ iree-run-module \
 CUDA 디바이스로 실행하여 GPU 연동을 확인합니다.
 
 ```bash
-airee-run-module \
+iree-run-module \
   --device=cuda \
   --module=mobilenet_cuda.vmfb \
   --function=torch-jit-export \
@@ -150,7 +150,7 @@ time iree-run-module --device=cuda --module=mobilenet_cuda.vmfb --function=torch
 정밀한 측정을 원한다면 다음처럼 벤치마크 도구를 활용하세요.
 
 ```bash
-airee-benchmark-module \
+iree-benchmark-module \
   --device=cuda \
   --module=mobilenet_cuda.vmfb \
   --function=torch-jit-export \
