@@ -80,10 +80,19 @@ wget https://github.com/onnx/models/raw/refs/heads/main/validated/vision/classif
 ## 8. ONNX → MLIR 변환
 IREE ONNX 임포터를 사용해 MLIR 모듈을 생성합니다. 필요한 경우 opset 버전이나 다이나믹 입력 형태를 플래그로 조정하세요.
 
+```bash 
+python 
+>>> import onnx
+>>> m = onnx.load("mobilenetv2-10.onnx")
+>>> print(m.opset_import)
+[version: 10
+]
+```
+
 ```bash
 iree-import-onnx mobilenetv2-10.onnx \
-  --opset-version=17 \
-  -o mobilenetv2.mlir
+  --opset-version=10 \
+  -o mobilenetv2-10.mlir
 ```
 
 변환 과정에서 경고가 발생하면 로그를 확인하고, 지원되지 않는 연산이 있는지 공식 문서를 참고합니다.
@@ -92,23 +101,23 @@ iree-import-onnx mobilenetv2-10.onnx \
 `iree-compile`을 이용해 CUDA 실행 파일 형식인 VM FlatBuffer(vmfb)로 변환합니다. 최적화 레벨을 다양하게 시도해 성능을 비교할 수 있습니다.
 
 ```bash
-iree-compile mobilenetv2.mlir \
+iree-compile mobilenetv2-10.mlir \
   --iree-hal-target-device=cuda \
   --iree-cuda-target=sm_86 \
   --iree-opt-level=O2 \
-  -o mobilenet_cuda.vmfb
+  -o mobilenetv2-10_cuda.vmfb
 
-iree-compile mobilenetv2.mlir \
+iree-compile mobilenetv2-10.mlir \
   --iree-hal-target-device=cuda \
   --iree-cuda-target=sm_86 \
   --iree-opt-level=O0 \
-  -o mobilenet_cuda_O0.vmfb
+  -o mobilenetv2-10_cuda_O0.vmfb
 
-iree-compile mobilenetv2.mlir \
+iree-compile mobilenetv2-10.mlir \
   --iree-hal-target-device=cuda \
   --iree-cuda-target=sm_86 \
   --iree-opt-level=O1 \
-  -o mobilenet_cuda_O1.vmfb
+  -o mobilenetv2-10_cuda_O1.vmfb
 ```
 
 - `--iree-hal-target-device`는 실행 대상(backend)을 지정합니다.
@@ -142,9 +151,9 @@ iree-run-module \
 최적화 레벨별 성능을 비교하려면 `time` 또는 `iree-benchmark-module`을 사용할 수 있습니다.
 
 ```bash
-time iree-run-module --device=cuda --module=mobilenet_cuda_O0.vmfb --function=torch-jit-export --input="1x3x224x224xf32=0"
-time iree-run-module --device=cuda --module=mobilenet_cuda_O1.vmfb --function=torch-jit-export --input="1x3x224x224xf32=0"
-time iree-run-module --device=cuda --module=mobilenet_cuda.vmfb --function=torch-jit-export --input="1x3x224x224xf32=0"
+time iree-run-module --device=cuda --module=mobilenetv2-10_cuda_O0.vmfb --function=torch-jit-export --input="1x3x224x224xf32=0"
+time iree-run-module --device=cuda --module=mobilenetv2-10_cuda_O1.vmfb --function=torch-jit-export --input="1x3x224x224xf32=0"
+time iree-run-module --device=cuda --module=mobilenetv2-10_cuda.vmfb --function=torch-jit-export --input="1x3x224x224xf32=0"
 ```
 
 정밀한 측정을 원한다면 다음처럼 벤치마크 도구를 활용하세요.
@@ -152,7 +161,7 @@ time iree-run-module --device=cuda --module=mobilenet_cuda.vmfb --function=torch
 ```bash
 iree-benchmark-module \
   --device=cuda \
-  --module=mobilenet_cuda.vmfb \
+  --module=mobilenetv2-10_cuda.vmfb \
   --function=torch-jit-export \
   --input="1x3x224x224xf32=0"
 ```
