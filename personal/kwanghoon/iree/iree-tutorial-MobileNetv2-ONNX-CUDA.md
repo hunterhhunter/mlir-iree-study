@@ -62,6 +62,12 @@ WSL 환경이라면 CUDA 라이브러리 위치를 명시해야 할 수 있습�
 export LD_LIBRARY_PATH="/usr/lib/wsl/lib:${LD_LIBRARY_PATH}"
 ```
 
+`ldconfig` 명령어로 라이브러리 위치를 확인할 수 있습니다.
+
+```bash
+ldconfig -p | grep libcuda
+```
+
 ## 7. MobileNetv2 ONNX 모델 다운로드
 공식 ONNX 모델 저장소에서 MobileNetv2 예제를 내려받습니다.
 
