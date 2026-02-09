@@ -130,7 +130,7 @@ CUDA 실행 전 CPU에서 모델이 정상 동작하는지 먼저 확인해 봅�
 ```bash
 iree-run-module \
   --device=cpu \
-  --module=mobilenet_cuda.vmfb \
+  --module=mobilenetv2-10_cuda.vmfb \
   --function=torch-jit-export \
   --input="1x3x224x224xf32=0"
 ```
@@ -143,7 +143,7 @@ CUDA 디바이스로 실행하여 GPU 연동을 확인합니다.
 ```bash
 iree-run-module \
   --device=cuda \
-  --module=mobilenet_cuda.vmfb \
+  --module=mobilenetv2-10_cuda.vmfb \
   --function=torch-jit-export \
   --input="1x3x224x224xf32=0"
 ```
