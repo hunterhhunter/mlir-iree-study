@@ -22,6 +22,11 @@ include "mlir/Interfaces/CastInterfaces.td" // ch4-inliner에서 추가
 
 include "toy/ShapeInferenceInterface.td"    // ch4-shapeinference에서 추가
 
+// LLVM 구조체 타입을 식별하기 위한 Type 정의
+def LLVM_Struct : Type<
+    CPred<"::llvm::isa<::mlir::LLVM::LLVMStructType>($_self)">, 
+    "LLVM struct type">;
+
 // Provide a definition of the 'toy' dialect in the ODS framework so that we
 // can define our operations.
 def Toy_Dialect : Dialect {
@@ -307,7 +312,8 @@ def PrintOp : Toy_Op<"print"> {
   }];
 
   // The print operation takes an input tensor to print.
-  let arguments = (ins AnyTypeOf<[Toy_Type, F64MemRef]>:$input);
+  let arguments = (ins AnyTypeOf<[Toy_Type, F64MemRef, LLVM_Struct]>:$input);
+  // let arguments = (ins AnyType:$input);
 
   let assemblyFormat = "$input attr-dict `:` type($input)";
 }
@@ -414,7 +420,11 @@ def StructAccessOp : Toy_Op<"struct_access", [Pure]> {
 // StructConstantOp
 //===----------------------------------------------------------------------===//
 
-def StructConstantOp : Toy_Op<"struct_constant", [ConstantLike, Pure]> {
+def StructConstantOp : Toy_Op<"struct_constant",[
+      ConstantLike,
+      Pure,
+      DeclareOpInterfaceMethods<ShapeInferenceOpInterface>
+    ]> {
   let summary = "struct constant";
   let description = [{
     Constant operation turns a literal struct value into an SSA value. The data

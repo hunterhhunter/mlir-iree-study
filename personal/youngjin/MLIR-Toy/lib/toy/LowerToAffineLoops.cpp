@@ -1,3 +1,4 @@
+#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinDialect.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -5,6 +6,7 @@
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/DialectRegistry.h"
 #include "mlir/IR/PatternMatch.h"
+#include "mlir/IR/SymbolTable.h"
 #include "mlir/IR/ValueRange.h"
 #include "mlir/Support/LLVM.h"
 #include "mlir/Support/TypeID.h"
@@ -37,7 +39,7 @@ using namespace mlir;
 
 /// Convert the given RankedTensorType into the corresponding MemRefType
 /// 텐서->MemRef로 타입만 바꾸는 함수
-struct MemRefType convertTensorToMemRef(RankedTensorType type) {
+static MemRefType convertTensorToMemRef(RankedTensorType type) {
     return MemRefType::get(type.getShape(), type.getElementType());
 }
 
@@ -372,6 +374,9 @@ void ToyToAffineLoweringPass::runOnOperation() {
         return llvm::none_of(op->getOperandTypes(),
                              [](Type type) { return llvm::isa<TensorType>(type); });
     });
+    
+    // 구조체 관련 Op를 Affine 레벨에서는 legalOp로 등록
+    target.addLegalOp<toy::StructAccessOp, toy::StructConstantOp>();
 
     RewritePatternSet patterns(&getContext());
     patterns.add<AddOpLowering, ConstantOpLowering, FuncOpLowering, MulOpLowering,

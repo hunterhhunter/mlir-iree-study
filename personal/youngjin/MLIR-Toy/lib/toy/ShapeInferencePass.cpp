@@ -9,6 +9,7 @@
 #include "toy/ShapeInferenceInterface.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/DebugLog.h"
 #include "llvm/Support/raw_ostream.h"
@@ -60,7 +61,18 @@ struct ShapeInferencePass
       // 인터페이스 캐스팅 시 명시적 네임스페이스 사용
       if (auto shapeOp = ::llvm::dyn_cast<::mlir::toy::ShapeInference>(op)) {
         shapeOp.inferShapes();
-      } else {
+      }
+      // 이 방법보다 더 좋은 방법은 Type을 비교하는 것 
+      // else if (op->getName().getStringRef() == "toy.struct_constant"){
+      //   // 구조체를 JIT로 실행하기 위해 구조체의 shape을 inference할 때는 넘어가도록 설정
+      //   continue;
+      // } 
+      // 결과가 1개인지 확인 후 0번에 접근해 StructType을 검사
+      else if (op->getNumResults() == 1 &&
+               llvm::isa<StructType>(op->getResult(0).getType())) {
+        continue;
+      }
+      else {
         op->emitError("unable to infer shape of operation without shape inference interface");
         return signalPassFailure();
       }
@@ -75,9 +87,23 @@ struct ShapeInferencePass
 
   // 모든 입력이 RankedTensorType인지 bool로 return 하는 함수
   static bool allOperandsInferred(::mlir::Operation *op) {
-    return ::llvm::all_of(op->getOperandTypes(), [](::mlir::Type t) {
-      return ::llvm::isa<::mlir::RankedTensorType>(t);
-    });
+    for (Value operand : op->getOperands()) {
+      Type type = operand.getType();
+
+      // 기존의 텐서인 경우 랭크가 있는지 확인하는 조건
+      if (auto tensorType = llvm::dyn_cast<RankedTensorType>(type)) {
+        if (!tensorType.hasRank())
+          return false;
+      }
+      // 구조체인 경우 Shape 개념이 없으므로 infered된 것으로 간주
+      else if (llvm::isa<StructType>(type)) {
+        continue;
+      }
+      else {
+        return true;
+      }
+    }
+    return true;
   }
 
   // 반환형이 <*xf64> 인지 bool로 return하는 함수

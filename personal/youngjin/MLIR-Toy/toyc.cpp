@@ -67,6 +67,7 @@
 #include "mlir/Target/LLVMIR/Dialect/LLVMIR/LLVMToLLVMIRTranslation.h"
 #include "mlir/Target/LLVMIR/Export.h"
 
+
 // 3. JIT Execution Engine (실행기)
 #include "mlir/ExecutionEngine/ExecutionEngine.h"
 #include "mlir/ExecutionEngine/OptUtils.h"
@@ -75,6 +76,8 @@
 #include "llvm/ExecutionEngine/Orc/JITTargetMachineBuilder.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Support/TargetSelect.h" 
+// 다른 include 문들 아래에 추가
+#include "mlir/Conversion/ReconcileUnrealizedCasts/ReconcileUnrealizedCasts.h"
 #endif
 
 using namespace toy;
@@ -349,6 +352,7 @@ static int dumpMLIR() {
 #if defined(CH6) || defined(CH7)
   if (isLoweringToLLVM) {
     pm.addPass(mlir::toy::createLowerToLLVMPass());
+    pm.addPass(mlir::createReconcileUnrealizedCastsPass()); // [중요] 남은 Cast 제거
 
     // [Chapter 7 추가] 디버그 정보(Line Table) 생성을 위한 DIScope 패스
     // 이 패스는 LLVM Dialect 내의 함수들에 디버그 범위를 지정하여

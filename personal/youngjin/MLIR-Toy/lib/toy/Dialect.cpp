@@ -13,6 +13,7 @@
 
 #include "toy/Dialect.h"
 
+#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinAttributes.h"
@@ -502,6 +503,33 @@ llvm::LogicalResult StructAccessOp::verify() {
     return emitOpError() << "must have the same result type as the struct "
                             "element referred to by the index";
   return mlir::success();
+}
+
+//===----------------------------------------------------------------------===//
+// StructConstantOp
+//===----------------------------------------------------------------------===//
+void StructConstantOp::inferShapes() {
+  //1. 현재 보유한 값 가져오기
+  ArrayAttr arrayAttr = getValue();
+  SmallVector<Type, 8> inferredTypes;
+
+  // 2. 값을 순회하며 타입 수집 (denseAttr)
+  for (Attribute attr : arrayAttr) {
+    if (auto denseAttr = llvm::dyn_cast<DenseElementsAttr>(attr)) {
+      // denseAttr은 이미 type이 결정되어있음.
+      inferredTypes.push_back(denseAttr.getType());
+    } else if (auto floatAttr = llvm::dyn_cast<FloatAttr>(attr)) {
+      inferredTypes.push_back(floatAttr.getType());
+    } else {
+      // 중첩 구조체 등 다른 케이스 처리(지금은 X)
+    }
+  }
+
+  // 3. 수집된 타입으로 새로운 구조체 생성
+  Type newStructType = StructType::get(inferredTypes);
+
+  // 4. 연산의 결과 타입을 바꾸기
+  getResult().setType(newStructType);
 }
 
 //===----------------------------------------------------------------------===//
