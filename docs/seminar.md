@@ -10,6 +10,11 @@
 - MLIR Tutorial 7장 세미나: https://docs.google.com/presentation/d/1RtzXuA2byauSz21bNBdQrNOJTsxX1MF9NnBTjW7huss/edit?usp=drive_link
 - MLIR Tutorial Struct Lowering: https://docs.google.com/presentation/d/1yXjpnfCAfSuKescAMDW6DdZgH0pGWTAKWogRFSwgios/edit?usp=drive_link
 - MLIR Tutorial CMake 구성: https://docs.google.com/presentation/d/1w4dGwTISQiInbHHF7Q-xbs0Y0jErG1bPJ-S-GS-FVII/edit?usp=drive_link
+- The Deep Learning Compiler Review: https://docs.google.com/presentation/d/1XlVIEbZCTQZzwkxv6wXgzPdYHA6zBtQ8he6-3mlZXB0/edit?usp=sharing
+- TinyIREE Review: https://docs.google.com/presentation/d/1s8-hNbAhuxeotQyA7qUDPJkz3PClTUu2hXC6pFWiWz0/edit?usp=sharing
+
 
 ## 📄 참고 자료
 - MLIR Toy Tutorial: https://mlir.llvm.org/docs/Tutorials/Toy/
+- The Deep Learning Compiler: https://arxiv.org/abs/2002.03794
+- TinyIREE: https://arxiv.org/abs/2205.14479
