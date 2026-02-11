@@ -1,0 +1,18 @@
+def transpose_multiply(a, b) {
+  return transpose(a) * transpose(b);
+}
+
+struct Struct {
+  var a;
+}
+
+def main() {
+  Struct k = { [1, 2, 3] };
+  print(k);
+  var aa = [1, 2, 3];
+  print(aa);
+}
+
+# Struct k를 llvm의 struct k
+# constant [1, 2, 3]을 llvm.struct_constant(1, 2, 3);
+# toy.struct의 tensor인자 타입을 MemRef 타입으로 변환
