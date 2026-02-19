@@ -1,0 +1,31 @@
+
+추론 스택
+
+1. API/서빙 계층(엔진)
+  - LLM이 토큰을 하니씩 생성하는 추론을, 많은 동시 요청에서 GPU 메모리 (KV cache)와 배칭을 효율적으로 운영해서 처리량을 높이는 실행/서빙 엔진
+  - 요청 수신, 배칭(batching), 스케쥴링, 스트리밍 응답, 메모리(KV cache) 운영
+  - vLLM, NVIDIA Triton Inference Server 
+
+2. 그래프/모델 실행 계층
+  - 모델을 실제로 실행(오퍼레이터 호출, 메모리 할당, 스트림 관리) 
+  - ONNX Runtime, Pytorch 
+
+3. 머신러닝 컴파일러 계층
+  - 그래프 최적화, 연산 fusion, 스케쥴링/타일링, 코드 생성, 양자화 
+  - MLIR, Apache TVM, XLA, IREE, TensorRT
+
+4. 디바이스/커널 계층
+  - CUDA, ROCm, Vulkan, Metal  
+
+
+참고문헌
+
+[Triton2019]
+Philippe Tillet, H. T. Kung, and David Cox. 2019. Triton: an intermediate language and compiler for tiled neural network computations.
+In Proceedings of the 3rd ACM SIGPLAN International Workshop on
+Machine Learning and Programming Languages (Phoenix, AZ, USA)
+(MAPL 2019). Association for Computing Machinery, New York, NY,
+USA, 10–19. https://doi.org/10.1145/3315508.3329973
+
+[vLLM2023]
+Woosuk Kwon, Zhuohan Li, Siyuan Zhuang, Ying Sheng, Lianmin Zheng, Cody Hao Yu, Joseph Gonzalez, Hao Zhang, and Ion Stoica. 2023. Efficient Memory Management for Large Language Model Serving with PagedAttention. In Proceedings of the 29th Symposium on Operating Systems Principles (SOSP '23). Association for Computing Machinery, New York, NY, USA, 611–626. https://doi.org/10.1145/3600006.3613165
