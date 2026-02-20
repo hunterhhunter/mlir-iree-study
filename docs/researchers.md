@@ -5,14 +5,14 @@
 ## 🇰🇷 Domestic (South Korea)
 
 ### 1. POSTECH (포항공과대학교)
-* **[Prof. Kwang-sun Kim (김광선 교수님)](https://cal.postech.ac.kr/)** - *Computer Architecture Laboratory (CAL)*
+* **[Prof. Kwang-sun Kim (김광선 교수)](https://cal.postech.ac.kr/)** - *Computer Architecture Laboratory (CAL)*
     * **Research Areas:** Computer Architecture, AI Accelerators, Simulation Frameworks.
     * **Key Works:**
         * **[`pytorch-sim`](https://github.com/PSAL-POSTECH/PyTorchSim):** PyTorch 기반의 아키텍처/시스템 시뮬레이션 프레임워크.
         * DRAM-PIM(Processing-in-Memory) 아키텍처 및 시스템 최적화.
 
 ### 2. KAIST (한국과학기술원)
-* **[Prof. Jeehoon Kang (강지훈 교수님)](https://sf.snu.ac.kr/jeehoon.kang/)** - *Concurrent & Parallel Programming Lab*
+* **[Prof. Jeehoon Kang (강지훈 교수)](https://sf.snu.ac.kr/jeehoon.kang/)** - *Concurrent & Parallel Programming Lab*
     * **Research Areas:** 컴파일러 최적화, 병렬 프로그래밍, SW/HW 검증.
     * **Key Works:** 텐서 컴파일러의 수학적 검증 및 최적화 연구.
 
@@ -20,12 +20,16 @@
 * **[Prof. Bernhard Egger](https://csap.snu.ac.kr/)** - *Computer Systems and Platforms Lab (CSAP)*
     * **Research Areas:** Compilers, Runtime Systems.
     * **Key Works:** 이기종 컴퓨팅을 위한 런타임 스케줄링, 컴파일러 최적화.
-* **[Prof. Jin-Soo Kim (김진수 교수님)](http://csl.snu.ac.kr/)** - *Computer Systems Lab*
+* **[Prof. Jin-Soo Kim (김진수 교수)](http://csl.snu.ac.kr/)** - *Computer Systems Lab*
     * **Research Areas:** Operating Systems, Storage Systems for AI.
 
 ### 4. UNIST (울산과학기술원)
-* **[Prof. Woongki Baek (백웅기 교수님)]** - *DCS Lab*
+* **[Prof. Woongki Baek (백웅기 교수)]** - *DCS Lab*
     * **Research Areas:** 효율적인 런타임 시스템, 모바일/클라우드 컴퓨팅 최적화.
+
+### 5. Korea University (고려대학교)
+* **[Prof. Yunho Oh (오윤호 교수)](https://comsys-lab.github.io/)** - *COMSYS Lab*
+    * **Research Areas:** GPU 컴퓨터 아키텍처 설계 
 
 ---
 
