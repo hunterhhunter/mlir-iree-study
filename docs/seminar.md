@@ -5,6 +5,7 @@
 ## 목차
 - [Paper Semina Materials](#-paper-seminar-materials)
 - [MLIR Tutorial & Seminar Materials](#-mlir-tutorial--seminar-materials)
+- [IREE Tutorial & Seminar Materials](#-iree-tutorial--seminar-materials)
 
 ## 📝 Paper Seminar Materials
 MLIR, IREE, 최신 컴파일러 아키텍처 및 IR 최적화 관련 논문 리뷰(Paper Review) 세미나 아카이브입니다.
@@ -43,3 +44,12 @@ MLIR Toy Tutorial 및 아키텍처(Architecture) 레이어별 세부 세미나 �
 ### 📄 레퍼런스 
 
 Official MLIR Toy Tutorial Documentation: https://mlir.llvm.org/docs/Tutorials/Toy/
+
+## 📂 IREE Tutorial & Seminar Materials
+
+IREE 세부 세미나 아카이브입니다.
+
+### 🧩 간단 벡터 덧셈 MLIR 프로그램 예제의 컴파일 단계별 분석
+
+- IREE VM과 HAL 분석 (조영진): [링크](https://docs.google.com/presentation/d/1Jjg6vrwx9J1onjiZ4GGhE-Tw-BkuiLtrAU5PNiRwQlk/edit?usp=sharing)
+
