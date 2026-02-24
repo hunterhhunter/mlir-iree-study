@@ -22,6 +22,8 @@
     * **Key Works:** 이기종 컴퓨팅을 위한 런타임 스케줄링, 컴파일러 최적화.
 * **[Prof. Jin-Soo Kim (김진수 교수)](http://csl.snu.ac.kr/)** - *Computer Systems Lab*
     * **Research Areas:** Operating Systems, Storage Systems for AI.
+* **[Prof. Sungjoo Yoo (유승주 교수)](https://cmalab.snu.ac.kr/))** - *Computing and Memory Architecture Lab*
+    * **Research Areas:** 딥러닝 알고리즘/소프트웨어 최적화, 딥러닝 가속기.
 
 ### 4. UNIST (울산과학기술원)
 * **[Prof. Woongki Baek (백웅기 교수)]** - *DCS Lab*
