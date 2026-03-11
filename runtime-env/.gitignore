@@ -20,6 +20,8 @@ logs/
 
 # Datasets
 datasets/
+!datasets/load_imagenet_1k.py
+!datasets/README.md
 
 # OS Specific
 .DS_Store
