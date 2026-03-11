@@ -19,9 +19,7 @@ logs/
 *.nsys-rep
 
 # Datasets
-datasets/
-!datasets/load_imagenet_1k.py
-!datasets/README.md
+datasets/imagenet_1k/
 
 # OS Specific
 .DS_Store
