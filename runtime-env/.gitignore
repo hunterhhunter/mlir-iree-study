@@ -1,0 +1,25 @@
+# Virtual Environment
+.venv/
+venv/
+ENV/
+
+# Python Cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# IREE Artifacts
+*.vmfb
+*.mlir
+*.onnx
+
+# Logs & Profiling
+logs/
+*.ncu-rep
+*.nsys-rep
+
+# Datasets
+datasets/
+
+# OS Specific
+.DS_Store
