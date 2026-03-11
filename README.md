@@ -19,3 +19,4 @@ mlir-iree-study/
 ├── 📁 docs/        # 연구 보고서 및 학습 노트 (Documentation)
 ├── 📁 scripts/     # 자동화 및 유틸리티 스크립트 (Utilities)
 └── 📁 personal/    # 개인별 실험 공간
+└── 📁 runtime-env/ # 모델을 IREE, Pytorch 등 실행해볼 수 있는 환경
