@@ -12,6 +12,7 @@ __pycache__/
 *.vmfb
 *.mlir
 *.onnx
+*.pt
 
 # Logs & Profiling
 logs/
@@ -19,7 +20,16 @@ logs/
 *.nsys-rep
 
 # Datasets
-datasets/imagenet_1k/
+dataset/*/
+!dataset/*.py
+!dataset/*.md
+
+# models
+models/*/
+!models/*.py
+!models/*.md
 
 # OS Specific
 .DS_Store
+
+GEMINI.md
