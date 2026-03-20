@@ -9,7 +9,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from runtimes.iree_rt import IREERuntime
 from data_loader import CustomDataLoader
-from evaluator.MobileNet_evaluator import MobileNetEvaluator
+from evaluators.MobileNet_evaluator import MobileNetEvaluator
 
 # 런타임 매핑
 RUNTIMES = {
