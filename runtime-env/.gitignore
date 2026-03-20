@@ -23,3 +23,5 @@ datasets/imagenet_1k/
 
 # OS Specific
 .DS_Store
+
+GEMINI.md
