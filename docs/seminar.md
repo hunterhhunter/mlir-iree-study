@@ -6,6 +6,8 @@
 - [Paper Semina Materials](#-paper-seminar-materials)
 - [MLIR Tutorial & Seminar Materials](#-mlir-tutorial--seminar-materials)
 - [IREE Tutorial & Seminar Materials](#-iree-tutorial--seminar-materials)
+- [AI Seminar Materials](#-ai-seminar-materials)
+- [AI HW & NPU Seminar Materials](#-ai-hw--npu-seminar-materials)
 
 ## 📝 Paper Seminar Materials
 MLIR, IREE, 최신 컴파일러 아키텍처 및 IR 최적화 관련 논문 리뷰(Paper Review) 세미나 아카이브입니다.
@@ -49,7 +51,24 @@ Official MLIR Toy Tutorial Documentation: https://mlir.llvm.org/docs/Tutorials/T
 
 IREE 세부 세미나 아카이브입니다.
 
-### 🧩 간단 벡터 덧셈 MLIR 프로그램 예제의 컴파일 단계별 분석
-
 - IREE VM과 HAL 분석 (조영진): [링크](https://docs.google.com/presentation/d/1Jjg6vrwx9J1onjiZ4GGhE-Tw-BkuiLtrAU5PNiRwQlk/edit?usp=sharing)
 
+- IREE Architecture (조영진): [링크](https://docs.google.com/presentation/d/1Jjg6vrwx9J1onjiZ4GGhE-Tw-BkuiLtrAU5PNiRwQlk/edit?usp=drive_link)
+
+- IREE Runtime과 ONNXruntime, Pytorch runtime의 비교 (조영진): [링크](https://docs.google.com/presentation/d/1gAtXsgs8nPl_NN5gR59cvHLVnoIe8Bb54wR1Szq7azc/edit?usp=drive_link)
+
+## AI Seminar Materials
+
+인공지능 관련 세미나 아카이브입니다.
+
+- 평가 모델 분석 (김지환): [링크](https://docs.google.com/presentation/d/1qDAcW45gzTC-MocKWIZ5u1R5i0f53mpuRHU4sDW3iNg/edit?usp=drive_link)
+
+- 모델 평가 메트릭 (김지환): [링크](https://docs.google.com/presentation/d/1i_QGs-70IrPtr5XB2lIfzb2uDsy6WT8Axik7ANKLtUE/edit?usp=drive_link)
+
+- Vision Model Architecture (김지환): [링크](https://docs.google.com/presentation/d/1331poPVrhotvdw32mSuAEVGQF38gnesGD0Ih_7l3JVA/edit?usp=drive_link)
+
+## AI HW & NPU Seminar Materials
+
+인공지능 반도체와 NPU 관련 세미나 아카이브입니다.
+
+- 국내 AI 반도체 SDK 현황 분석 (김지환): [링크](https://docs.google.com/presentation/d/18RQASm05-4cJj__kRWHCMxanAax2mO-UAQHdoepohG8/edit?usp=drive_link)
