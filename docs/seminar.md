@@ -6,8 +6,8 @@
 - [Paper Semina Materials](#-paper-seminar-materials)
 - [MLIR Tutorial & Seminar Materials](#-mlir-tutorial--seminar-materials)
 - [IREE Tutorial & Seminar Materials](#-iree-tutorial--seminar-materials)
-- [AI Seminar Materials](#-ai-seminar-materials)
-- [AI HW & NPU Seminar Materials](#-ai-hw--npu-seminar-materials)
+- [AI Seminar Materials](#ai-seminar-materials)
+- [AI HW & NPU Seminar Materials](#ai-hw--npu-seminar-materials)
 
 ## 📝 Paper Seminar Materials
 MLIR, IREE, 최신 컴파일러 아키텍처 및 IR 최적화 관련 논문 리뷰(Paper Review) 세미나 아카이브입니다.
