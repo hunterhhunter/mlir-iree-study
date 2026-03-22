@@ -19,7 +19,9 @@ logs/
 *.nsys-rep
 
 # Datasets
-datasets/imagenet_1k/
+datasets/*
+!datasets/**/*.py
+!datasets/**/*.md
 
 # OS Specific
 .DS_Store
@@ -28,3 +30,4 @@ datasets/imagenet_1k/
 .agent/
 GEMINI.md
 plan.md
+scratchpad.md

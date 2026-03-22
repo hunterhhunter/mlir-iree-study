@@ -5,11 +5,11 @@ from tqdm import tqdm
 
 def main():
     # 설정값
-    DATASET_NAME = "imagenet-1k"
-    SPLIT = "validation"
+    DATASET_NAME = "cifar10"
+    SPLIT = "test"
     NUM_SAMPLES = 3000
-    OUTPUT_DIR = "datasets/imagenet_1k/val"
-    LABEL_FILE = "datasets/imagenet_1k/val_labels.txt"
+    OUTPUT_DIR = "datasets/cifar10/test"
+    LABEL_FILE = "datasets/cifar10/test_labels.txt"
 
     # 디렉토리 생성
     os.makedirs(OUTPUT_DIR, exist_ok=True)
@@ -18,7 +18,9 @@ def main():
     
     try:
         # 스트리밍 모드로 로드하여 필요한 만큼만 가져옴
-        dataset = load_dataset(DATASET_NAME, split=SPLIT, streaming=True, trust_remote_code=True)
+        # CIFAR-10은 전체 크기가 작으므로, 스트리밍 모드(ZIP 파싱)에서 발생하는 무한 대기 버그를 피하기 위해
+        # 일반 모드(streaming=False)로 전체 캐싱 후 처리합니다.
+        dataset = load_dataset(DATASET_NAME, split=SPLIT)
         
         labels_list = []
         
@@ -28,7 +30,8 @@ def main():
             if i >= NUM_SAMPLES:
                 break
             
-            image = item['image']
+            # 공식 cifar10은 'img' 키를 사용하고, imagenet은 'image'를 사용하므로 범용 대응
+            image = item.get('image', item.get('img'))
             label = item['label']
             
             # 파일명 형식: image_0000.jpg
