@@ -14,7 +14,7 @@ from src.core.benchmarkrunner import BenchmarkRunner
 from src.dataloader.image_classification_loader import ImageClassificationLoader
 from src.runtimes.onnx_rt import OnnxRuntime
 # ResNet50Evaluator는 사실상 보편적인 ImageNet-1K 분류 평가기이므로 그대로 재사용 가능합니다.
-from src.evaluators.resnet50_evaluator import ResNet50Evaluator
+from src.evaluators.image_classification_loader import ResNet50Evaluator
 
 def get_onnx_io_names(onnx_path):
     """ONNX 모델의 첫 번째 입력과 출력의 이름을 자동으로 추출합니다."""
@@ -29,7 +29,7 @@ def main():
     print("="*60)
     
     # 방금 다운로드하신 모델 경로를 지정합니다.
-    onnx_model_path = os.path.join(project_root, 'models/Kalray_mobilenet-v2', 'mobilenetv2.onnx')
+    onnx_model_path = os.path.join(project_root, 'models/google-mobilenet-v2', 'mobilenet.onnx')
     
     # 사용자님이 확보하신 3000장 ImageNet 데이터셋 경로 설정
     dataset_path = os.path.join(project_root, 'datasets/imagenet_1k')

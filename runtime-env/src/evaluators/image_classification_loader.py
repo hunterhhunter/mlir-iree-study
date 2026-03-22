@@ -22,6 +22,12 @@ class ResNet50Evaluator(Evaluator):
         logits_key = list(result.outputs.keys())[0]
         logits = result.outputs[logits_key]
         
+        # [예외 처리] 구글 공식 MobileNetV2 등 일부 모델은 1001 클래스(0번: background)를 출력합니다.
+        # ImageNet-1K 정답셋(0~999)과 매핑시키기 위해, 1001개일 경우 0번 인덱스를 잘라냅니다.
+        if hasattr(logits, "shape") and len(logits.shape) >= 2 and logits.shape[-1] == 1001:
+            logits = logits[..., 1:]
+
+        
         # 2. 정답지(labels) 타입 검증 및 치환
         labels = result.labels
         if not isinstance(labels, np.ndarray):
