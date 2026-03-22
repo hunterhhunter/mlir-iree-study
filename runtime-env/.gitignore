@@ -19,10 +19,13 @@ logs/
 *.nsys-rep
 
 # Datasets
-datasets/imagenet_1k/
+datasets/*
+!datasets/**/*.py
+!datasets/**/*.md
 
 # OS Specific
 .DS_Store
 
 GEMINI.md
 plan.md
+scratchpad.md
