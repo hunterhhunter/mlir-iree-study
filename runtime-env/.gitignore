@@ -26,6 +26,8 @@ datasets/*
 # OS Specific
 .DS_Store
 
+#Agent Workspace
+.agent/
 GEMINI.md
 plan.md
 scratchpad.md
