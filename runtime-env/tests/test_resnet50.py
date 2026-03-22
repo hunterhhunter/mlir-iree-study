@@ -12,7 +12,7 @@ from src.core.compiled_model import CompiledModel
 from src.core.benchmarkrunner import BenchmarkRunner
 from src.dataloader.image_classification_loader import ImageClassificationLoader
 from src.runtimes.onnx_rt import OnnxRuntime
-from src.evaluators.resnet50_evaluator import ResNet50Evaluator
+from src.evaluators.image_classification_evaluator import ImageClassificationEvaluator
 
 def prepare_dummy_dataset(base_path, num_samples=10):
     """임의의 ImageNet 형태 더미 데이터셋 20장을 만들어냅니다."""
@@ -125,7 +125,7 @@ def main():
     runtime = OnnxRuntime(device="cpu")
     runtime.load(compiled_model)
     
-    evaluator = ResNet50Evaluator(top_k=(1, 5))
+    evaluator = ImageClassificationEvaluator(top_k=(1, 5))
     
     # 4. 오케스트레이터(BenchmarkRunner) 구동
     runner = BenchmarkRunner(dataloader=loader, runtime=runtime, evaluator=evaluator)
