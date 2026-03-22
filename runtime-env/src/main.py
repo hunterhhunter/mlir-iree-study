@@ -13,11 +13,10 @@ from src.core.model_spec import Model_Spec, Task
 from src.core.compiled_model import CompiledModel
 from src.core.benchmarkrunner import BenchmarkRunner
 
-# 구체화된 컴포넌트 임포트
-from src.dataloader.image_classification_loader import ImageClassificationLoader
-# 사용자가 resnet50_evaluator.py를 image_classification_loader.py로 리네임하였음
-from src.evaluators.image_classification_loader import ResNet50Evaluator  
-from src.runtimes.onnx_rt import OnnxRuntime
+# 구체화된 컴포넌트 임포트 (Facade Pattern 적용)
+from src.dataloader import create_dataloader, ImageClassificationLoader
+from src.evaluators import create_evaluator
+from src.runtimes import create_runtime
 # from src.runtimes.iree_rt import IREERuntime  # 향후 IREE 백엔드 추가 시 주석 해제
 
 def _parse_onnx_io_names(onnx_path):
@@ -49,6 +48,7 @@ def main():
     parser.add_argument("--onnx", type=str, required=True, help="ONNX 파일의 절대 또는 상대 경로")
     parser.add_argument("--dataset", type=str, required=True, help="평가용 데이터셋 최상위 디렉토리 (예: datasets/imagenet_1k)")
     parser.add_argument("--backend", type=str, default="onnxruntime", choices=["onnxruntime", "iree"], help="추론을 실행할 백엔드 (기본: onnxruntime)")
+    parser.add_argument("--device", type=str, default="cpu", help="추론 장치 (예: cpu, cuda, 기본: cpu)")
     parser.add_argument("--batch-size", "-b", type=int, default=1, help="추론 배치 사이즈 (기본: 1)")
     parser.add_argument("--warmup", "-w", type=int, default=2, help="웜업 횟수 (기본: 2)")
     
@@ -56,7 +56,7 @@ def main():
     
     print("\n" + "="*60)
     print(f" BenchmarkRunner CLI - Project: Antigravity ")
-    print(f"   Model: {args.model} | Backend: {args.backend}")
+    print(f"   Model: {args.model} | Backend: {args.backend} | Device: {args.device}")
     print("="*60)
     
     if not os.path.exists(args.onnx):
@@ -87,16 +87,17 @@ def main():
         label_file=dataset_label_file
     )
     
-    # 런타임 팩토리 로직 분기
-    if args.backend.lower() == "onnxruntime":
-        runtime = OnnxRuntime(device="cpu")
-    else:
-        print(f"[Error] '{args.backend}' 백엔드는 현재 CLI 연동이 준비 중입니다.")
+    # 런타임 팩토리 로직
+    try:
+        runtime = create_runtime(args.backend, device=args.device)
+    except Exception as e:
+        print(f"[Error] {e}")
         sys.exit(1)
         
     runtime.load(compiled_model)
     
-    evaluator = ResNet50Evaluator(top_k=(1, 5))
+    # 평가기 팩토리 로직
+    evaluator = create_evaluator(spec, top_k=(1, 5))
     
     # 3. 오케스트레이터 구동
     runner = BenchmarkRunner(dataloader=loader, runtime=runtime, evaluator=evaluator)

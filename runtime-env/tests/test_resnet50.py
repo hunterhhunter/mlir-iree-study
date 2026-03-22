@@ -10,9 +10,9 @@ sys.path.append(project_root)
 from src.core.model_spec import Model_Spec, Task
 from src.core.compiled_model import CompiledModel
 from src.core.benchmarkrunner import BenchmarkRunner
-from src.dataloader.image_classification_loader import ImageClassificationLoader
-from src.runtimes.onnx_rt import OnnxRuntime
-from src.evaluators.image_classification_evaluator import ImageClassificationEvaluator
+from src.dataloader import ImageClassificationLoader
+from src.runtimes import OnnxRuntime
+from src.evaluators import ImageClassificationEvaluator
 
 def prepare_dummy_dataset(base_path, num_samples=10):
     """임의의 ImageNet 형태 더미 데이터셋 20장을 만들어냅니다."""
