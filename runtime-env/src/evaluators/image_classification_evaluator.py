@@ -6,9 +6,9 @@ from .base import Evaluator
 from ..core.model_spec import Model_Spec
 from ..core.inference_result import InferenceResult
 
-class ResNet50Evaluator(Evaluator):
+class ImageClassificationEvaluator(Evaluator):
     """
-    ResNet50 (Image Classification) 성능 평가 모듈.
+    이미지 분류(Image Classification) 성능 평가 모듈.
     """
     def __init__(self, **eval_options):
         # 딕셔너리에서 설정값을 추출 (기본값 설정)
