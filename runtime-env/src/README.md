@@ -1,4 +1,4 @@
-# Antigravity Benchmark Framework
+# Benchmark Framework
 
 이 디렉토리는 다양한 AI 모델(ResNet50, MobileNet 등)과 런타임 백엔드(ONNX, IREE)의 추론 성능을 일관성 있게 측정하기 위한 벤치마크 프레임워크 소스 코드를 담고 있습니다.
 

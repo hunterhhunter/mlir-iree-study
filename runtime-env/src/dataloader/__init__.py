@@ -8,6 +8,7 @@ DataLoader 클래스들에 대한 손쉬운 접근(단일 진입점 API)을 제�
 from ..core.model_spec import Model_Spec, Task
 from .base import DataLoader
 from .image_classification_loader import ImageClassificationLoader
+from .object_detection_loader import ObjectDetectionLoader
 
 def create_dataloader(model_spec: Model_Spec, **kwargs) -> DataLoader:
     """
@@ -30,16 +31,16 @@ def create_dataloader(model_spec: Model_Spec, **kwargs) -> DataLoader:
     
     if task == Task.IMAGE_CLASSIFICATION:
         return ImageClassificationLoader(model_spec, **kwargs)
-    
-    # 추후 NLP, Object Detection, MatMul 등의 Task 로더가 추가되면
-    # elif task == Task.NLP_CLASSIFICATION: 로직을 확장하면 됩니다.
-    
+    elif task == Task.OBJECT_DETECTION:
+        return ObjectDetectionLoader(model_spec, **kwargs)
+        
+    # 추후 NLP 등의 Task 로더가 추가되면 확장
     else:
         raise ValueError(f"현재 '{task.name}' Task를 지원하는 DataLoader가 구현되어 있지 않습니다.")
 
-# 인터페이스 명확화를 위해 외부에서 접근할 수 있는 목록을 __all__ 로 제어
 __all__ = [
     "DataLoader",
     "ImageClassificationLoader",
+    "ObjectDetectionLoader",
     "create_dataloader"
 ]
