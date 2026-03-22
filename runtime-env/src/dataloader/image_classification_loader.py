@@ -74,16 +74,34 @@ class ImageClassificationLoader(DataLoader):
             self.target_hw = (224, 224)  # 폴백
 
         # 3. 정규화 특화 상수(mean, std) 파싱 설계
-        # 사용자가 kwargs로 지정했다면 최우선
+        config_mean, config_std = None, None
+        
+        # 모델 경로 기반으로 preprocessor_config.json 자동 감지 및 파싱
+        if "onnx" in self.model_spec.model_paths:
+            onnx_path = self.model_spec.model_paths["onnx"]
+            config_path = os.path.join(os.path.dirname(onnx_path), "preprocessor_config.json")
+            if os.path.exists(config_path):
+                try:
+                    with open(config_path, "r") as f:
+                        config_data = json.load(f)
+                    config_mean = config_data.get("image_mean")
+                    config_std = config_data.get("image_std")
+                    print(f"[DataLoader] Loaded preprocessing config from {config_path}")
+                except Exception as e:
+                    print(f"[DataLoader] Failed to parse config: {e}")
+
+        # 사용자가 kwargs로 지정 > config.json 파싱 > 기본값 순으로 결정
         if "mean" in kwargs:
             self.mean = np.array(kwargs["mean"], dtype=np.float32)
+        elif config_mean is not None:
+            self.mean = np.array(config_mean, dtype=np.float32)
         else:
-            # 모델 이름을 보고 유추 (단순화: 일단 대부분 ImageNet 쓴다고 가정)
-            # 추후 resnet, mobilenet 등 파싱 로직 확장 가능
             self.mean = np.array(IMAGENET_MEAN, dtype=np.float32)
             
         if "std" in kwargs:
             self.std = np.array(kwargs["std"], dtype=np.float32)
+        elif config_std is not None:
+            self.std = np.array(config_std, dtype=np.float32)
         else:
             self.std = np.array(IMAGENET_STD, dtype=np.float32)
 
