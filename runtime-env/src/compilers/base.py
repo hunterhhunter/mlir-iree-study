@@ -4,6 +4,7 @@ import os
 
 # ..core.model_spec 가 존재한다고 가정
 from ..core.model_spec import Model_Spec
+from ..core.compiled_model import CompiledModel
 
 class Compiler(ABC):
     """
@@ -28,7 +29,7 @@ class Compiler(ABC):
         pass
         
     @abstractmethod
-    def compile(self, model_spec: Model_Spec, output_dir: str) -> str:
+    def compile(self, model_spec: Model_Spec, output_dir: str) -> CompiledModel:
         """
         주어진 모델 스펙을 바탕으로 실제 컴파일을 수행합니다.
         
@@ -37,7 +38,7 @@ class Compiler(ABC):
             output_dir (str): 컴파일된 바이너리가 저장될 대상 폴더 경로
             
         Returns:
-            str: 성공적으로 컴파일된 결과 바이너리 파일의 절대 경로
+            CompiledModel: 성공적으로 컴파일된 결과 바이너리 정보가 담긴 DTO 객체
         """
         pass
         

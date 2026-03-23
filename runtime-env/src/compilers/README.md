@@ -32,8 +32,8 @@ compiler = get_compiler(
 # 3. 컴파일 수행 (VMFB 바이너리 생성)
 # 캐시에 이미 존재하면 중복 수행 없이 파일 경로만 반환합니다.
 try:
-    binary_path = compiler.compile(spec, output_dir="/path/to/save/dir")
-    print(f"[*] 성공적으로 조립된 바이너리 경로: {binary_path}")    
+    compiled_model = compiler.compile(spec, output_dir="/path/to/save/dir")
+    print(f"[*] 성공적으로 조립된 바이너리 경로: {compiled_model.artifact_path}")    
 except Exception as e:
     print(f"[!] 컴파일 도중 에러가 발생했습니다: {e}")
 ```
@@ -51,7 +51,9 @@ except Exception as e:
 # src/compilers/tvm_compiler.py
 from .base import Compiler
 from ..core.model_spec import Model_Spec
+from ..core.compiled_model import CompiledModel
 import os
+from pathlib import Path
 
 class TVMCompiler(Compiler):
     def __init__(self, **compile_options):
@@ -62,10 +64,11 @@ class TVMCompiler(Compiler):
         # 파일명 규칙을 자유롭게 프레임워크 특징에 맞게 정합니다.
         return f"{model_spec.name}_tvm_{self.target}.so"
 
-    def compile(self, model_spec: Model_Spec, output_dir: str) -> str:
+    def compile(self, model_spec: Model_Spec, output_dir: str) -> CompiledModel:
         # 0. 중복 캐시 점검 (권장 방어 코드)
         if self.is_cached(model_spec, output_dir):
-            return os.path.join(output_dir, self.get_artifact_name(model_spec))
+            final_path = os.path.join(output_dir, self.get_artifact_name(model_spec))
+            return CompiledModel(spec=model_spec, backend_name=self.target, artifact_path=Path(final_path))
             
         # 1. 모델 읽어오기
         onnx_path = model_spec.model_paths.get("onnx")
@@ -74,9 +77,9 @@ class TVMCompiler(Compiler):
         print("Compiling via Apache TVM...")
         # ... tvm.relay.build(...) 로직 ...
         
-        # 3. .so 바이너리를 output_dir에 저장하고 최종 절대 경로를 반환합니다.
+        # 3. .so 바이너리를 output_dir에 저장하고 최종 DTO 시그니처 형식을 반환합니다.
         final_path = os.path.join(output_dir, self.get_artifact_name(model_spec))
-        return final_path
+        return CompiledModel(spec=model_spec, backend_name=self.target, artifact_path=Path(final_path))
 ```
 
 ### Step 2. 팩토리 (Factory API) 경로 개척하기

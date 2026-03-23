@@ -7,6 +7,7 @@ import iree.compiler.tools as ireec
 
 from .base import Compiler
 from ..core.model_spec import Model_Spec
+from ..core.compiled_model import CompiledModel
 
 class IREECompiler(Compiler):
     def __init__(self, **compile_options):
@@ -44,7 +45,7 @@ class IREECompiler(Compiler):
             
         return v17_onnx_path
 
-    def compile(self, model_spec: Model_Spec, output_dir: str) -> str:
+    def compile(self, model_spec: Model_Spec, output_dir: str) -> CompiledModel:
         """
         ONNX 소스 모델을 MLIR로 낮추고(Lowering) 최종적으로 IREE VMFB 바이너리로 컴파일합니다.
         """
@@ -56,7 +57,7 @@ class IREECompiler(Compiler):
         # 0. 캐시 점검
         if self.is_cached(model_spec, output_dir):
             print(f"[IREE Compiler] Cached VMFB found at {final_artifact_path}. Skipping compilation.")
-            return final_artifact_path
+            return CompiledModel(spec=model_spec, backend_name=self.target_backend, artifact_path=Path(final_artifact_path))
 
         # 모델 스펙에서 ONNX 경로 가져오기 (Model_Spec이 복수 경로 dict 형태로 변경된 것에 대응)
         source_model_path = getattr(model_spec, 'model_paths', {}).get('onnx')
@@ -103,4 +104,4 @@ class IREECompiler(Compiler):
 
         # 완료 후 불필요한 중간 산출물(선택적) 제거를 고려해 볼 수 있으나 디버깅을 위해 유지합니다.
         
-        return final_artifact_path
+        return CompiledModel(spec=model_spec, backend_name=self.target_backend, artifact_path=Path(final_artifact_path))

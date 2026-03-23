@@ -67,17 +67,17 @@ class TestIREECompilerIntegration(unittest.TestCase):
         
         # 컴파일 수행 (시간이 걸릴 수 있음)
         print(" -> Compiling... This may take a few minutes.")
-        final_vmfb_path = compiler.compile(self.spec, output_dir=self.output_dir)
+        compiled_model = compiler.compile(self.spec, output_dir=self.output_dir)
         
         # 검증 1: 반환된 존재 파일 경로가 정상인가?
-        self.assertTrue(os.path.exists(final_vmfb_path), "VMFB output file does not exist.")
-        self.assertIn("resnet50_iree_cpu.vmfb", final_vmfb_path)
-        print(f" -> [OK] Compilation successful! Saved at: {final_vmfb_path}")
+        self.assertTrue(os.path.exists(compiled_model.artifact_path), "VMFB output file does not exist.")
+        self.assertIn("resnet50_iree_cpu.vmfb", str(compiled_model.artifact_path))
+        print(f" -> [OK] Compilation successful! Saved at: {compiled_model.artifact_path}")
         
         # 검증 2: 캐시 히트 동작 확인 (바로 리턴되어야 함)
         print(" -> Testing cache hit...")
-        cached_vmfb_path = compiler.compile(self.spec, output_dir=self.output_dir)
-        self.assertEqual(final_vmfb_path, cached_vmfb_path)
+        cached_model = compiler.compile(self.spec, output_dir=self.output_dir)
+        self.assertEqual(str(compiled_model.artifact_path), str(cached_model.artifact_path))
         print(" -> [OK] Cache hit functional.")
 
 if __name__ == "__main__":
