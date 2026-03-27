@@ -1,0 +1,4 @@
+class_id cx cy w h
+0.0 0.1 0.1 0.1 0.1
+wrong data format without enough numbers
+3.0 0.8 0.8 0.1 0.1
