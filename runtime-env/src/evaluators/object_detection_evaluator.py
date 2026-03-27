@@ -214,13 +214,20 @@ class ObjectDetectionEvaluator(Evaluator):
         }
 
     def _calculate_latency_metrics(self, timing_records: List[float]) -> Dict[str, float]:
-        """내부 헬퍼 함수: 실행 소요 시간(Latency)만 전담하여 계산함."""
+        """내부 헬퍼 함수: 실행 소요 시간(Latency) 및 처리량(FPS)을 기반으로 지표를 계산함."""
         if not timing_records:
             return {}
             
+        avg_latency = float(np.mean(timing_records))
+        p99_latency = float(np.percentile(timing_records, 99))
+        
+        # Latency 값이 밀리초(ms) 단위이므로, 1초(1000ms)를 지연 시간으로 나누면 1초당 프레임 수(FPS) 도출
+        fps = 1000.0 / avg_latency if avg_latency > 0 else 0.0
+        
         return {
-            "Average Latency (ms)": float(np.mean(timing_records)),
-            "P99 Latency (ms)": float(np.percentile(timing_records, 99))
+            "Average Latency (ms)": avg_latency,
+            "P99 Latency (ms)": p99_latency,
+            "FPS": fps
         }
 
     def is_applicable(self, device_spec: Dict[str, Any], model_spec: Model_Spec) -> bool:
@@ -232,5 +239,5 @@ class ObjectDetectionEvaluator(Evaluator):
         """해당 모듈에서 반환 가능한 지표 이름의 목록을 반환함."""
         return [
             "mAP@0.5", "Average Detections", 
-            "Average Latency (ms)", "P99 Latency (ms)", "Total Samples"
+            "Average Latency (ms)", "P99 Latency (ms)", "FPS", "Total Samples"
         ]
