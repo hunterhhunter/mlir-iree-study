@@ -1,164 +1,136 @@
 """
 Object Detection DataLoader
 
-- 로컬 데이터 폴더에서 이미지를 읽고 COCO 포맷의 JSON 어노테이션을 파싱합니다.
-- 이미지를 모델의 입력 형태에 맞게 리사이징(Padding or Scale)하며, 
-  동시에 Bounding Box의 좌표도 리사이징된 비율에 맞게 보정하여 반환합니다.
+- 로컬 데이터 폴더에서 이미지를 읽고 전처리하는 순수 numpy 기반의 데이터 로더.
+- Model_Spec 객체를 활용하여 모델 입력 형태를 추출.
+- YOLO 형식(.txt)의 라벨 파일 형식을 기본으로 파싱.
 """
 
 import os
-import json
-from typing import Dict, List, Any, Tuple
 import numpy as np
 from PIL import Image
+from typing import Dict, List, Any, Tuple
 from .base import DataLoader
 from ..core.model_spec import Model_Spec
-
-# 범용 ImageNet 정규화 상수 (기본 폴백 용도)
-IMAGENET_MEAN = (0.485, 0.456, 0.406)
-IMAGENET_STD = (0.229, 0.224, 0.225)
 
 class ObjectDetectionLoader(DataLoader):
     def __init__(self, model_spec: Model_Spec, **kwargs):
         """
-        초기화 메서드. COCO 포맷 형태의 어노테이션을 파싱하고 매핑합니다.
+        초기화 메서드.
+        
+        Args:
+            model_spec (Model_Spec): 코어 스펙 규격 인스턴스.
+            **kwargs:
+                - 'dataset_path': 데이터셋 로컬 루트 디렉토리
+                - 'image_dir': 이미지 파일 디렉토리
+                - 'label_dir': YOLO 형식의 TXT 라벨 디렉토리
+                - 'mean': 정규화 평균값 (기본값: [0, 0, 0])
+                - 'std': 정규화 표준편차 (기본값: [1, 1, 1])
         """
         self.model_spec = model_spec
         
-        # 1. 경로 설정
-        self.base_path = kwargs.get("dataset_path", "./data/dummy_dataset")
-        self.image_dir = kwargs.get("image_dir", os.path.join(self.base_path, "images"))
-        self.label_file = kwargs.get("label_file", os.path.join(self.base_path, "annotations.json"))
+        # 1. 파일 경로 설정 및 초기화
+        self.base_path = kwargs.get("dataset_path", "./data/coco128")
+        self.image_dir = kwargs.get("image_dir", os.path.join(self.base_path, "images", "train2017"))
+        self.label_dir = kwargs.get("label_dir", os.path.join(self.base_path, "labels", "train2017"))
         
-        # 2. COCO 딕셔너리 파싱 및 매핑
-        self.images_info: List[Dict[str, Any]] = []
-        self.annotations_map: Dict[int, List[Dict[str, Any]]] = {}
-        
-        if os.path.exists(self.label_file):
-            print(f"[DataLoader] Parsing COCO annotations from {self.label_file}...")
-            with open(self.label_file, "r") as f:
-                coco_data = json.load(f)
+        self.image_files: List[str] = []
+        if os.path.exists(self.image_dir):
+            self.image_files = sorted([
+                f for f in os.listdir(self.image_dir) 
+                if f.lower().endswith(('.jpg', '.jpeg', '.png'))
+            ])
             
-            # 이미지 목록 추출
-            if "images" in coco_data:
-                self.images_info = coco_data["images"]
-                for img in self.images_info:
-                    self.annotations_map[img["id"]] = []
-            
-            # 어노테이션(Bbox) 목록 매핑
-            if "annotations" in coco_data:
-                for ann in coco_data["annotations"]:
-                    img_id = ann["image_id"]
-                    if img_id in self.annotations_map:
-                        self.annotations_map[img_id].append(ann)
-        else:
-            print(f"[DataLoader] Warning: Annotation file not found at {self.label_file}")
-            
-        self.total_samples = len(self.images_info)
+        self.total_samples = len(self.image_files)
         self.current_idx = 0
         
-        # 3. 형상(Shape) 정보 파싱
-        input_shape_tuple = next(iter(model_spec.input_shapes.values()))
-        if len(input_shape_tuple) >= 2:
-            self.target_hw = (input_shape_tuple[-2], input_shape_tuple[-1])
-        else:
-            self.target_hw = (640, 640)  # 일반적인 객체 탐지 폴백 (e.g. YOLO)
-            
-        # 4. 정규화 특화 상수 파싱 설계
-        config_mean, config_std = None, None
-        if "onnx" in self.model_spec.model_paths:
-            onnx_path = self.model_spec.model_paths["onnx"]
-            config_path = os.path.join(os.path.dirname(onnx_path), "preprocessor_config.json")
-            if os.path.exists(config_path):
-                try:
-                    with open(config_path, "r") as f:
-                        config_data = json.load(f)
-                    config_mean = config_data.get("image_mean")
-                    config_std = config_data.get("image_std")
-                    print(f"[DataLoader] Loaded preprocessing config from {config_path}")
-                except Exception as e:
-                    print(f"[DataLoader] Failed to parse config: {e}")
+        # 2. 모델 정보에 기반한 내부 속성 구성 
+        self.target_hw = self._parse_target_shape(kwargs)
+        self.mean, self.std = self._setup_normalization(kwargs)
+        self.layout = kwargs.get("layout", "NCHW").upper()
 
-        # 사용자 입력 > 설정 파일 > 기본값 순의 대체(Fallback) 처리
-        if "mean" in kwargs:
-            self.mean = np.array(kwargs["mean"], dtype=np.float32)
-        elif config_mean is not None:
-            self.mean = np.array(config_mean, dtype=np.float32)
-        else:
-            self.mean = np.array(IMAGENET_MEAN, dtype=np.float32)
+    def _parse_target_shape(self, kwargs: Dict[str, Any]) -> Tuple[int, int]:
+        """Model_Spec에서 입력 차원(H, W)을 안전하게 추출하는 헬퍼 메서드"""
+        # 1. 사용자가 명시적으로 해상도를 덮어씌웠다면 취우선 적용 (예: target_hw=(1280, 1280))
+        if "target_hw" in kwargs:
+            return tuple(kwargs["target_hw"])
             
-        if "std" in kwargs:
-            self.std = np.array(kwargs["std"], dtype=np.float32)
-        elif config_std is not None:
-            self.std = np.array(config_std, dtype=np.float32)
-        else:
-            self.std = np.array(IMAGENET_STD, dtype=np.float32)
+        # 2. Model_Spec의 텐서 형태에서 추론 (NCHW, NHWC 모두 대응)
+        input_shape_tuple = next(iter(self.model_spec.input_shapes.values()))
+        
+        # 배치(보통 1)나 채널(보통 3)이 아닌, 4를 초과하는 큰 숫자들만 골라냅니다.
+        # 예: (1, 640, 640, 3) 이면 spatial_dims는 [640, 640]이 됨
+        spatial_dims = [dim for dim in input_shape_tuple if dim is not None and dim > 4]
+        
+        if len(spatial_dims) >= 2:
+            return (spatial_dims[0], spatial_dims[1])
+            
+        # 3. 정보를 찾을 수 없으면 YOLO 기본 해상도 폴백
+        return (640, 640)  # YOLO 기본 해상도 폴백
+
+    def _setup_normalization(self, kwargs: Dict[str, Any]) -> Tuple[np.ndarray, np.ndarray]:
+        """정규화 상수를 파싱하여 리턴하는 헬퍼 메서드"""
+        mean = np.array(kwargs.get("mean", [0.0, 0.0, 0.0]), dtype=np.float32)
+        std = np.array(kwargs.get("std", [1.0, 1.0, 1.0]), dtype=np.float32)
+        return mean, std
+
+    def _get_label_path(self, img_filename: str) -> str:
+        """이미지 파일명에 1:1로 대응되는 YOLO 라벨 파일 경로 생성"""
+        base_name = os.path.splitext(img_filename)[0]
+        return os.path.join(self.label_dir, f"{base_name}.txt")
+
+    def _parse_yolo_label(self, label_path: str) -> np.ndarray:
+        """단일 텍스트 파일을 읽고 [class_id, cx, cy, w, h] Numpy 배열로 반환하는 파서"""
+        labels_list = []
+        if os.path.exists(label_path):
+            with open(label_path, "r") as f:
+                for line in f:
+                    parts = line.strip().split()
+                    if len(parts) >= 5:
+                        try:
+                            # '0.0' 처럼 소수점 형태의 클래스 아이디 방어 로직 추가
+                            class_id = int(float(parts[0]))
+                            cx, cy, w, h = map(float, parts[1:5])
+                            labels_list.append([class_id, cx, cy, w, h])
+                        except ValueError:
+                            # 텍스트 헤더나 잘못된 라벨 포맷이 섞여있어도 크래시 내지 않고 무시합니다.
+                            continue
+        
+        if len(labels_list) > 0:
+            return np.array(labels_list, dtype=np.float32)
+        return np.empty((0, 5), dtype=np.float32)
 
     def load_single(self) -> Dict[str, Any]:
-        """단일 이미지를 로드하고 바운딩 박스를 리사이즈된 크기에 맞춰 변환하여 반환합니다."""
+        """단일 이미지와 매칭되는 라벨을 로드하고 최종 딕셔너리로 패키징합니다."""
         if self.current_idx >= self.total_samples:
             raise StopIteration("모든 샘플이 소진되었습니다.")
             
-        img_info = self.images_info[self.current_idx]
-        img_id = img_info["id"]
-        img_filename = img_info["file_name"]
-        
-        original_width = img_info.get("width", None)
-        original_height = img_info.get("height", None)
-        
+        img_filename = self.image_files[self.current_idx]
         self.current_idx += 1
         
+        # 각 작업 위임
         img_path = os.path.join(self.image_dir, img_filename)
-        raw_annotations = self.annotations_map.get(img_id, [])
+        label_path = self._get_label_path(img_filename)
+        label_array = self._parse_yolo_label(label_path)
+        tensor = self.preprocess(img_path)
         
-        # 이미지 로드 실패 시 에러 처리
-        if not os.path.exists(img_path):
-             return {"input": None, "targets": {"boxes": [], "labels": []}, "img_path": img_path, "error": "Not Found"}
-             
-        img = Image.open(img_path).convert("RGB")
-        
-        # JSON 명세에 크기값이 없는 경우 실측
-        if original_width is None or original_height is None:
-            original_width, original_height = img.size
-            
-        tensor = self.preprocess(img)
-        
-        # Bounding Box 위치(Scale) 보정
-        # COCO 포맷: [x_min, y_min, width, height]
-        scale_x = self.target_hw[1] / original_width
-        scale_y = self.target_hw[0] / original_height
-        
-        boxes = []
-        labels = []
-        for ann in raw_annotations:
-            x_min, y_min, w, h = ann["bbox"]
-            scaled_box = [x_min * scale_x, y_min * scale_y, w * scale_x, h * scale_y]
-            boxes.append(scaled_box)
-            labels.append(ann["category_id"])
-            
         return {
             "input": tensor,
-            "targets": {
-                "boxes": np.array(boxes, dtype=np.float32) if boxes else np.empty((0, 4), dtype=np.float32),
-                "labels": np.array(labels, dtype=np.int64) if labels else np.empty((0,), dtype=np.int64)
-            },
-            "img_path": img_path,
-            "original_size": (original_height, original_width)  # 원본 복원 및 평가 시 필요
+            "label": label_array,
+            "img_path": img_path
         }
 
     def load_batch(self, batch_size: int) -> List[Dict[str, Any]]:
         batch = []
         for _ in range(batch_size):
             try:
-                data = self.load_single()
-                if "error" not in data:
-                     batch.append(data)
+                batch.append(self.load_single())
             except StopIteration:
                 break
         return batch
 
     def get_labels(self) -> Any:
-        return self.annotations_map
+        return None
 
     def get_metadata(self) -> Dict[str, Any]:
         return {
@@ -170,6 +142,7 @@ class ObjectDetectionLoader(DataLoader):
         }
 
     def preprocess(self, raw_input: Any) -> np.ndarray:
+        """순수 Numpy와 PIL 위주로 이미지 리사이즈 체인 수행"""
         if isinstance(raw_input, str):
             img = Image.open(raw_input)
         else:
@@ -178,9 +151,18 @@ class ObjectDetectionLoader(DataLoader):
         img = img.convert("RGB")
         img = img.resize((self.target_hw[1], self.target_hw[0]), Image.Resampling.BILINEAR)
         
+        # 스케일링 (0~255) -> (0.0~1.0)
         img_array = np.array(img, dtype=np.float32) / 255.0
+        
+        # 정규화
         img_array = (img_array - self.mean) / self.std
         
-        # (H, W, C) -> (C, H, W)
-        img_array = np.transpose(img_array, (2, 0, 1))
+        # 3. 모델의 입맛에 맞게(NCHW vs NHWC) 메모리 레이아웃 변경 대응
+        if self.layout == "NHWC":
+            # 이미지가 (H, W, C) 형태이므로 그대로 통과
+            pass
+        else:
+            # 보편적인 PyTorch/ONNX 스타일인 NCHW (C, H, W) 포맷 전환
+            img_array = np.transpose(img_array, (2, 0, 1))
+            
         return img_array

@@ -8,6 +8,7 @@ Evaluator Package Initialization & Factory
 from ..core.model_spec import Model_Spec, Task
 from .base import Evaluator
 from .image_classification_evaluator import ImageClassificationEvaluator
+from .object_detection_evaluator import ObjectDetectionEvaluator
 
 def create_evaluator(model_spec: Model_Spec, **kwargs) -> Evaluator:
     """
@@ -31,11 +32,14 @@ def create_evaluator(model_spec: Model_Spec, **kwargs) -> Evaluator:
         return ImageClassificationEvaluator(**kwargs)
     
     # 추후 NLP, Object Detection 등의 Task 평가기가 확장되면 여기에 추가
+    elif task == Task.OBJECT_DETECTION:
+        return ObjectDetectionEvaluator(**kwargs)
     else:
         raise ValueError(f"현재 '{task.name}' Task를 지원하는 Evaluator가 구현되어 있지 않습니다.")
 
 __all__ = [
     "Evaluator",
     "ImageClassificationEvaluator",
-    "create_evaluator"
+    "create_evaluator",
+    "ObjectDetectionEvaluator"
 ]

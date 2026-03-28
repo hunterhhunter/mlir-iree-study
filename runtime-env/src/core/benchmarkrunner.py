@@ -26,7 +26,13 @@ class BenchmarkRunner:
             if key == "input":
                 collated[key] = np.stack([item[key] for item in batch_list], axis=0)
             elif key == "label":
-                collated[key] = np.array([item[key] for item in batch_list])
+                # 파이썬 안티 패턴(try-except 제어 흐름) 제거
+                # 모든 정답지의 형태(Shape)가 일치하면 Numpy 압축, 하나라도 다르면 리스트 유지
+                shapes = set(np.array(item[key]).shape for item in batch_list)
+                if len(shapes) == 1:
+                    collated[key] = np.array([item[key] for item in batch_list])
+                else:
+                    collated[key] = [item[key] for item in batch_list]
             else:
                 collated[key] = [item[key] for item in batch_list]
         return collated
@@ -102,7 +108,12 @@ class BenchmarkRunner:
             for out_key in all_outputs_list[0].keys():
                 aggregated_outputs[out_key] = np.concatenate([out[out_key] for out in all_outputs_list], axis=0)
                 
-        aggregated_labels = np.array(all_labels_list)
+        # 리스트 요소들의 모양이 모두 같으면 배열로, 다르면 리스트로 유지
+        shapes = set(np.array(lbl).shape for lbl in all_labels_list)
+        if len(shapes) == 1:
+            aggregated_labels = np.array(all_labels_list)
+        else:
+            aggregated_labels = all_labels_list
         
         # 공통 DTO 규격으로 래핑
         result_dto = InferenceResult(
