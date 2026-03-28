@@ -8,6 +8,7 @@ Evaluator Package Initialization & Factory
 from ..core.model_spec import Model_Spec, Task
 from .base import Evaluator
 from .image_classification_evaluator import ImageClassificationEvaluator
+from .llama_evaluator import LlamaEvaluator
 
 def create_evaluator(model_spec: Model_Spec, **kwargs) -> Evaluator:
     """
@@ -29,13 +30,17 @@ def create_evaluator(model_spec: Model_Spec, **kwargs) -> Evaluator:
         # 단일 책임 원칙: 이미지 분류 테스크는 ImageClassificationEvaluator가 전담
         # 추후 MobileNet 특화 로직이 별도로 필요하면 model_spec.name 등을 통해 분기 가능
         return ImageClassificationEvaluator(**kwargs)
-    
-    # 추후 NLP, Object Detection 등의 Task 평가기가 확장되면 여기에 추가
+
+    elif task == Task.NLP_GENERATION:
+        return LlamaEvaluator(**kwargs)
+
+    # 추후 Object Detection 등의 Task 평가기가 확장되면 여기에 추가
     else:
         raise ValueError(f"현재 '{task.name}' Task를 지원하는 Evaluator가 구현되어 있지 않습니다.")
 
 __all__ = [
     "Evaluator",
     "ImageClassificationEvaluator",
+    "LlamaEvaluator",
     "create_evaluator"
 ]

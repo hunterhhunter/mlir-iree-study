@@ -157,6 +157,51 @@ class ObjectDetectionLoader(DataLoader):
                 break
         return batch
 
+    def load_by_index(self, index: int) -> Dict[str, Any]:
+        """
+        인덱스 기반 직접 접근 — LoadGen QSL 콜백 및 랜덤 접근 지원용.
+        current_idx 상태를 변경하지 않습니다.
+        """
+        if index < 0 or index >= self.total_samples:
+            raise IndexError(
+                f"index {index} is out of range [0, {self.total_samples})"
+            )
+
+        img_info         = self.images_info[index]
+        img_id           = img_info["id"]
+        img_filename     = img_info["file_name"]
+        original_width   = img_info.get("width",  None)
+        original_height  = img_info.get("height", None)
+
+        img_path = os.path.join(self.image_dir, img_filename)
+        if not os.path.exists(img_path):
+            return {"input": None, "targets": {"boxes": [], "labels": []},
+                    "img_path": img_path, "error": "Not Found"}
+
+        img = Image.open(img_path).convert("RGB")
+        if original_width is None or original_height is None:
+            original_width, original_height = img.size
+
+        tensor  = self.preprocess(img)
+        scale_x = self.target_hw[1] / original_width
+        scale_y = self.target_hw[0] / original_height
+
+        boxes, labels = [], []
+        for ann in self.annotations_map.get(img_id, []):
+            x_min, y_min, w, h = ann["bbox"]
+            boxes.append([x_min * scale_x, y_min * scale_y, w * scale_x, h * scale_y])
+            labels.append(ann["category_id"])
+
+        return {
+            "input": tensor,
+            "targets": {
+                "boxes":  np.array(boxes,  dtype=np.float32) if boxes  else np.empty((0, 4), dtype=np.float32),
+                "labels": np.array(labels, dtype=np.int64)   if labels else np.empty((0,),   dtype=np.int64),
+            },
+            "img_path":      img_path,
+            "original_size": (original_height, original_width),
+        }
+
     def get_labels(self) -> Any:
         return self.annotations_map
 

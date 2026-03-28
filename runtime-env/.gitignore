@@ -12,6 +12,7 @@ __pycache__/
 *.vmfb
 *.mlir
 *.onnx
+*.pt
 
 # Models
 models/
@@ -37,3 +38,4 @@ datasets/*
 GEMINI.md
 plan.md
 scratchpad.md
+CLAUDE.md
