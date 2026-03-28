@@ -64,12 +64,11 @@ class ImageClassificationLoader(DataLoader):
         # 통상 비전 모델은 입력을 1개만 받는다고 간주하고 첫 번째 밸류의 시각 정보(H, W)를 추출
         input_shape_tuple = next(iter(model_spec.input_shapes.values()))
         
-        # (N, C, H, W) 또는 (1, 224, 224, 3) 등 다양한 포맷 중
-        # 마지막 24나 224 등 공간 차원을 PIL 모델 리사이즈 기준으로 삼기 위한 휴리스틱:
-        # 편의를 위해 일단 Vision 모델의 경우 224x224 등의 정사각형 또는 가장 큰 두 숫자를 추출하거나
-        # 아니면 NCHW 기준 끝의 두 개(H, W)라고 가정합니다.
-        if len(input_shape_tuple) >= 2:
-            self.target_hw = (input_shape_tuple[-2], input_shape_tuple[-1])
+        # 배치(보통 1)나 채널(보통 3)이 아닌, 4를 초과하는 큰 숫자들을 해상도(H, W)로 인식
+        spatial_dims = [dim for dim in input_shape_tuple if dim is not None and dim > 4]
+        
+        if len(spatial_dims) >= 2:
+            self.target_hw = (spatial_dims[0], spatial_dims[1])
         else:
             self.target_hw = (224, 224)  # 폴백
 
@@ -104,6 +103,8 @@ class ImageClassificationLoader(DataLoader):
             self.std = np.array(config_std, dtype=np.float32)
         else:
             self.std = np.array(IMAGENET_STD, dtype=np.float32)
+            
+        self.layout = kwargs.get("layout", "NCHW").upper()
 
     def load_single(self) -> Dict[str, Any]:
         if self.current_idx >= self.total_samples:
@@ -155,6 +156,11 @@ class ImageClassificationLoader(DataLoader):
         img_array = np.array(img, dtype=np.float32) / 255.0
         img_array = (img_array - self.mean) / self.std
         
-        # (H, W, C) -> (C, H, W)
-        img_array = np.transpose(img_array, (2, 0, 1))
+        # 모델의 요구에 맞게 메모리 레이아웃 대응
+        if self.layout == "NHWC":
+            pass
+        else:
+            # (H, W, C) -> (C, H, W) 변환
+            img_array = np.transpose(img_array, (2, 0, 1))
+            
         return img_array

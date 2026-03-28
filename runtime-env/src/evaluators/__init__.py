@@ -8,6 +8,7 @@ Evaluator Package Initialization & Factory
 from ..core.model_spec import Model_Spec, Task
 from .base import Evaluator
 from .image_classification_evaluator import ImageClassificationEvaluator
+from .object_detection_evaluator import ObjectDetectionEvaluator
 
 def create_evaluator(model_spec: Model_Spec, **kwargs) -> Evaluator:
     """
