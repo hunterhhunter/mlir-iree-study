@@ -51,6 +51,9 @@ class LlamaEvaluator(Evaluator):
             labels = [labels]
 
         num_samples = logits.shape[0]
+        if num_samples == 0:
+            return {"Exact Match": 0.0, "F1 Score": 0.0, "num_samples": 0}
+
         em_scores, f1_scores = [], []
 
         for i in range(num_samples):
