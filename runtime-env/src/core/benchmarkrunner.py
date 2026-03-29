@@ -16,27 +16,61 @@ class BenchmarkRunner:
         self.dataloader = dataloader
         self.runtime = runtime
         self.evaluator = evaluator
+        
+        # DataLoader의 공식 메타데이터 계약(Contract)을 통해 Fast-Path 여부 확인
+        metadata = self.dataloader.get_metadata()
+        self.is_static_batched = metadata.get("is_static_batched", False)
 
-    def _collate_batch(self, batch_list: List[Dict[str, Any]]) -> Dict[str, Any]:
+    def _collate_batch(self, batch_list: Any) -> Dict[str, Any]:
         """
         List of single sample dicts -> Batched dict (np.stack)
         """
+        if self.is_static_batched:
+            # Fast-path: DataLoader 메타데이터 명세서 계약에 의해 이미 그룹화된 통짜 구조물이 넘어온 경우
+            return batch_list
+
         collated = {}
         for key in batch_list[0].keys():
             if key == "input":
-                collated[key] = np.stack([item[key] for item in batch_list], axis=0)
-            elif key == "label":
-                # 파이썬 안티 패턴(try-except 제어 흐름) 제거
-                # 모든 정답지의 형태(Shape)가 일치하면 Numpy 압축, 하나라도 다르면 리스트 유지
-                shapes = set(np.array(item[key]).shape for item in batch_list)
-                if len(shapes) == 1:
-                    collated[key] = np.array([item[key] for item in batch_list])
+                # 입력 피처(Feature Tensor)만 Runtime 전달을 위해 Numpy Stack 수행
+                first_input = batch_list[0][key]
+                if isinstance(first_input, dict):
+                    # Multi-input 딕셔너리 내부를 각각 병합
+                    collated[key] = {
+                        k: np.stack([item[key][k] for item in batch_list], axis=0)
+                        for k in first_input.keys()
+                    }
                 else:
-                    collated[key] = [item[key] for item in batch_list]
+                    collated[key] = np.stack([item[key] for item in batch_list], axis=0)
             else:
+                # 정답지(label) 및 메타 데이터는 차원 검사 없이 순수 List로 원형 보존 (SOLID 규칙)
                 collated[key] = [item[key] for item in batch_list]
         return collated
 
+    def _prepare_runtime_input(self, collated_input: Any, fallback_name: str) -> Dict[str, Any]:
+        """로더가 던진 input이 딕셔너리(Multi-input)면 통째로 반환, 아니면 단일 노드(Single-input) 이름으로 래핑합니다."""
+        if isinstance(collated_input, dict):
+            return collated_input
+        return {fallback_name: collated_input}
+
+
+
+    def _aggregate_results(self, all_outputs_list: List[Dict[str, Any]], all_labels_list: List[Any], timing_records: List[float]) -> InferenceResult:
+        """
+        루프 종료 후 수집된 추론 산출물을 최종 공통 DTO 규격으로 고속 병합합니다.
+        정답지(Labels) 조립의 경우 차원에 대한 지식 없이 Evaluator에게 조립 권한을 위임합니다.
+        """
+        aggregated_outputs = {}
+        if all_outputs_list:
+            for out_key in all_outputs_list[0].keys():
+                aggregated_outputs[out_key] = np.concatenate([out[out_key] for out in all_outputs_list], axis=0)
+
+        # 안전하고 빠른 고속 라벨 배송 로직 (결합은 Evaluator가 자신의 도메인 규칙에 맞게 처리)
+        return InferenceResult(
+            outputs=aggregated_outputs,
+            timing_records=timing_records,
+            labels=all_labels_list
+        )
     def run(self, warmup_runs: int = 1, batch_size: int = 1) -> Dict[str, Any]:
         """
         주입된 컴포넌트들을 연결하여 벤치마크 테스트 전체 루프를 수행합니다.
@@ -62,8 +96,7 @@ class BenchmarkRunner:
             if warmup_batch:
                 collated = self._collate_batch(warmup_batch)
                 
-                # DataLoader의 기본 키인 "input"을 모델의 실제 입력값 이름표로 매핑
-                runtime_input = {input_name: collated["input"]}
+                runtime_input = self._prepare_runtime_input(collated["input"], input_name)
                 self.runtime.warmup(runtime_input, num_runs=warmup_runs)
 
         # 본 실행을 위해 DataLoader 순회를 첫 번째 샘플로 되돌립니다.
@@ -83,8 +116,11 @@ class BenchmarkRunner:
                 break
                 
             collated = self._collate_batch(batch)
-            runtime_input = {input_name: collated["input"]}
-            all_labels_list.extend(collated["label"])
+            
+            runtime_input = self._prepare_runtime_input(collated["input"], input_name)
+            
+            # DataLoader가 던져준 원형(List, Tensor, Dict 등) 그대로 안전하게 적재
+            all_labels_list.append(collated["label"])
             
             # 단일 Batch 시간 정밀 측정 시작
             start_time = time.perf_counter()
@@ -97,30 +133,18 @@ class BenchmarkRunner:
             all_outputs_list.append(outputs)
             
             if batch_idx % 10 == 0:
-                print(f"  - Completed batch {batch_idx} ({len(collated['input'])} samples), Latency: {latency_ms:.2f} ms")
+                # Multi-input 딕셔너리일 경우 텐서의 0번째 축(배치) 길이를 구해 정확한 샘플 수 계측
+                if isinstance(collated["input"], dict):
+                    first_key = next(iter(collated["input"]))
+                    actual_batch_size = len(collated["input"][first_key])
+                else:
+                    actual_batch_size = len(collated["input"])
+                    
+                print(f"  - Completed batch {batch_idx} ({actual_batch_size} samples), Latency: {latency_ms:.2f} ms")
             batch_idx += 1
             
         print("[BenchmarkRunner] 📊 Aggregating results...")
-        
-        # List 형식을 Evaluator가 선호하는 통짜 Numpy Array 딕셔너리로 병합
-        aggregated_outputs = {}
-        if all_outputs_list:
-            for out_key in all_outputs_list[0].keys():
-                aggregated_outputs[out_key] = np.concatenate([out[out_key] for out in all_outputs_list], axis=0)
-                
-        # 리스트 요소들의 모양이 모두 같으면 배열로, 다르면 리스트로 유지
-        shapes = set(np.array(lbl).shape for lbl in all_labels_list)
-        if len(shapes) == 1:
-            aggregated_labels = np.array(all_labels_list)
-        else:
-            aggregated_labels = all_labels_list
-        
-        # 공통 DTO 규격으로 래핑
-        result_dto = InferenceResult(
-            outputs=aggregated_outputs,
-            timing_records=timing_records,
-            labels=aggregated_labels
-        )
+        result_dto = self._aggregate_results(all_outputs_list, all_labels_list, timing_records)
         
         print("[BenchmarkRunner] 🏆 Evaluating metrics...")
         metrics = self.evaluator.evaluate(result_dto)
