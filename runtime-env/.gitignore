@@ -7,6 +7,7 @@ ENV/
 __pycache__/
 *.py[cod]
 *$py.class
+.pytest_cache/
 
 # IREE Artifacts
 *.vmfb
@@ -39,3 +40,4 @@ GEMINI.md
 plan.md
 scratchpad.md
 CLAUDE.md
+.gstack/
