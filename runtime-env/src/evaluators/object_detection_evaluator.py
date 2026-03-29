@@ -25,8 +25,17 @@ class ObjectDetectionEvaluator(Evaluator):
         pred_key = list(result.outputs.keys())[0]
         preds = result.outputs[pred_key]
         
-        # 2. 정답지(labels) 추출
-        labels = result.labels
+        # 2. 정답지(labels) 추출 및 1D(Batch 전개) 평탄화 처리 (SOLID)
+        raw_labels = result.labels
+        labels = []
+        if isinstance(raw_labels, list):
+            for batch_labels in raw_labels:
+                if isinstance(batch_labels, list):
+                    labels.extend(batch_labels)
+                else:
+                    labels.append(batch_labels)
+        else:
+            labels = raw_labels
         
         batch_size = len(labels) if isinstance(labels, (list, tuple, np.ndarray)) else 0
         metrics["Total Samples"] = batch_size

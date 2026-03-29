@@ -3,7 +3,7 @@ from typing import Dict, Any, List
 
 from .base import Evaluator
 from src.core.inference_result import InferenceResult
-from src.core.model_spec import Model_Spec
+from src.core.model_spec import Model_Spec, Task
 
 class BertClassificationEvaluator(Evaluator):
     """
@@ -21,7 +21,7 @@ class BertClassificationEvaluator(Evaluator):
         ]
         
     def is_applicable(self, device_spec: Dict[str, Any], model_spec: Model_Spec) -> bool:
-        return getattr(model_spec, "task", "") == "nlp_classification"
+        return getattr(model_spec, "task", None) == Task.NLP_CLASSIFICATION
         
     def evaluate(self, result: InferenceResult) -> Dict[str, Any]:
         """추론 결과(Logits)를 받아 내부 프라이빗 객체(Helper)들에게 각각 연산을 위임하여 채점함."""
@@ -29,7 +29,19 @@ class BertClassificationEvaluator(Evaluator):
         
         # 1. 텐서 추출 및 차원 안전 장치 적용
         logits = self._extract_logits(result.outputs.get("logits", np.array([])))
-        labels = np.array(result.labels)
+        # 2. 정답지(labels) 1D 병합 위임 처리 (SOLID)
+        raw_labels = result.labels
+        labels = []
+        if isinstance(raw_labels, list):
+            for batch in raw_labels:
+                if isinstance(batch, (list, np.ndarray)):
+                    labels.extend(batch)
+                else:
+                    labels.append(batch)
+        else:
+            labels = raw_labels
+            
+        labels = np.array(labels)
         
         # 2. 정확도(Accuracy) 채점 위임
         accuracy_metrics = self._calculate_accuracy_metrics(logits, labels)
