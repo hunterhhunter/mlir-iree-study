@@ -1,6 +1,12 @@
 import numpy as np
 from typing import Dict, Any
 
+from ..utils.cuda_preload import preload_cuda_libs
+
+# onnxruntime import 전에 CUDA 라이브러리를 사전 로드합니다.
+# 자세한 내용은 src/utils/cuda_preload.py 참조.
+preload_cuda_libs()
+
 import onnxruntime as ort
 
 from .base import Runtime
@@ -18,7 +24,21 @@ class OnnxRuntime(Runtime):
         self.device = runtime_options.get("device", "cpu")
         
         # ONNX Runtime의 Execution Provider 설정
+        _SUPPORTED_DEVICES = {"cpu", "cuda"}
+        if self.device not in _SUPPORTED_DEVICES:
+            raise ValueError(
+                f"지원하지 않는 device입니다: '{self.device}'. "
+                f"지원 목록: {sorted(_SUPPORTED_DEVICES)}"
+            )
+
         if self.device == "cuda":
+            available = ort.get_available_providers()
+            if "CUDAExecutionProvider" not in available:
+                raise RuntimeError(
+                    "CUDAExecutionProvider를 사용할 수 없습니다. "
+                    "onnxruntime-gpu 설치 여부와 CUDA 환경을 확인하세요. "
+                    f"현재 가용 Provider: {available}"
+                )
             self.providers = ['CUDAExecutionProvider', 'CPUExecutionProvider']
         else:
             self.providers = ['CPUExecutionProvider']
