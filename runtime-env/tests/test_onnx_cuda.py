@@ -24,7 +24,7 @@ sys.path.insert(0, project_root)
 from src.core.model_spec import Model_Spec, Task
 from src.core.compiled_model import CompiledModel
 from src.runtimes import OnnxRuntime
-from src.runtimes.onnx_rt import _preload_cuda_libs
+from src.utils.cuda_preload import preload_cuda_libs, _detect_cuda_version
 
 # ---------------------------------------------------------------------------
 # 테스트 픽스처
@@ -97,12 +97,37 @@ requires_model = pytest.mark.skipif(
 # 테스트 케이스
 # ---------------------------------------------------------------------------
 
+class TestCudaPreloadUtil:
+    """src.utils.cuda_preload 유틸리티 단위 테스트"""
+
+    def test_preload_does_not_raise(self):
+        """preload_cuda_libs()는 CUDA 환경 유무와 무관하게 예외를 던지지 않아야 합니다."""
+        preload_cuda_libs()
+
+    def test_detect_cuda_version_returns_int_or_none(self):
+        """_detect_cuda_version()은 int 또는 None을 반환해야 합니다."""
+        ver = _detect_cuda_version()
+        assert ver is None or isinstance(ver, int), f"예상치 못한 반환 타입: {type(ver)}"
+
+    def test_detect_cuda_version_matches_installed_packages(self):
+        """nvidia-cuda-runtime-cu?? 패키지가 있으면 해당 버전이 감지되어야 합니다."""
+        import importlib.metadata
+        detected = _detect_cuda_version()
+        if detected is None:
+            pytest.skip("CUDA 패키지가 설치되어 있지 않습니다.")
+        pkg_name = f"nvidia-cuda-runtime-cu{detected}"
+        try:
+            importlib.metadata.version(pkg_name)
+        except importlib.metadata.PackageNotFoundError:
+            pytest.fail(f"감지된 버전 cu{detected}에 해당하는 패키지 '{pkg_name}'가 없습니다.")
+
+
 class TestCudaProvider:
     """CUDAExecutionProvider 가용성 검증"""
 
     def test_cuda_libs_preload_does_not_raise(self):
-        """_preload_cuda_libs()는 CUDA 환경 유무와 무관하게 예외를 던지지 않아야 합니다."""
-        _preload_cuda_libs()  # should not raise
+        """preload_cuda_libs()는 CUDA 환경 유무와 무관하게 예외를 던지지 않아야 합니다."""
+        preload_cuda_libs()  # should not raise
 
     def test_cuda_provider_available(self):
         """CUDAExecutionProvider가 ort.get_available_providers()에 포함되어야 합니다."""
