@@ -72,3 +72,5 @@ IREE 세부 세미나 아카이브입니다.
 인공지능 반도체와 NPU 관련 세미나 아카이브입니다.
 
 - 국내 AI 반도체 SDK 현황 분석 (김지환): [링크](https://docs.google.com/presentation/d/18RQASm05-4cJj__kRWHCMxanAax2mO-UAQHdoepohG8/edit?usp=drive_link)
+- MLPerf 아키텍처 및 분석 (조영진): [링크](https://docs.google.com/presentation/d/14El_MixBm1T2CN2jsvWUTTqmdCE46YCkgu9g_caM-t4/edit?usp=sharing)
+- 벤치마크 프레임워크 아키텍처 (김지환): [링크](https://docs.google.com/presentation/d/1fp9vMmVWXBRUBXqz0ushdlNmsPlKjAT8nNM7kHArhgg/edit?slide=id.p#slide=id.p)
