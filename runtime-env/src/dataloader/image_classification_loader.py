@@ -75,23 +75,34 @@ class ImageClassificationLoader(DataLoader):
 
         # 3. 입력 형상(H, W) 파싱
         input_shape_tuple = next(iter(model_spec.input_shapes.values()))
-        self.target_hw = (
-            (input_shape_tuple[-2], input_shape_tuple[-1])
-            if len(input_shape_tuple) >= 2
-            else (224, 224)
-        )
+
+        # 배치(보통 1)나 채널(보통 3)이 아닌, 4를 초과하는 큰 숫자들을 해상도(H, W)로 인식
+        spatial_dims = [dim for dim in input_shape_tuple if dim is not None and dim > 4]
+
+        if len(spatial_dims) >= 2:
+            self.target_hw = (spatial_dims[0], spatial_dims[1])
+        else:
+            self.target_hw = (224, 224)  # 폴백
 
         # 4. 정규화 상수 결정 (kwargs > preprocessor_config.json > ImageNet 기본값)
         config_mean, config_std = self._try_load_preprocessor_config()
 
-        self.mean = np.array(
-            kwargs.get("mean", config_mean if config_mean is not None else IMAGENET_MEAN),
-            dtype=np.float32,
-        )
-        self.std = np.array(
-            kwargs.get("std",  config_std  if config_std  is not None else IMAGENET_STD),
-            dtype=np.float32,
-        )
+        # 사용자가 kwargs로 지정 > config.json 파싱 > 기본값 순으로 결정
+        if "mean" in kwargs:
+            self.mean = np.array(kwargs["mean"], dtype=np.float32)
+        elif config_mean is not None:
+            self.mean = np.array(config_mean, dtype=np.float32)
+        else:
+            self.mean = np.array(IMAGENET_MEAN, dtype=np.float32)
+
+        if "std" in kwargs:
+            self.std = np.array(kwargs["std"], dtype=np.float32)
+        elif config_std is not None:
+            self.std = np.array(config_std, dtype=np.float32)
+        else:
+            self.std = np.array(IMAGENET_STD, dtype=np.float32)
+
+        self.layout = kwargs.get("layout", "NCHW").upper()
 
         # 5. 전처리 전략 주입 (기본값: MLPerfResNet50Preprocess)
         self.preprocess_strategy: PreprocessStrategy = kwargs.get(
