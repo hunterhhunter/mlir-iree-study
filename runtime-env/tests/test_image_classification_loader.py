@@ -29,7 +29,7 @@ def test_imagenet():
         spec, 
         dataset_path=base_dir,
         image_dir=val_images_dir,
-        label_file=val_labels_file
+        label_path=val_labels_file
     )
     
     print(f"[*] Metadata: {loader.get_metadata()}")
@@ -63,7 +63,7 @@ def test_cifar10():
         spec, 
         dataset_path=base_dir,
         image_dir=test_images_dir,
-        label_file=test_labels_file
+        label_path=test_labels_file
     )
     
     print(f"[*] Metadata: {loader.get_metadata()}")
