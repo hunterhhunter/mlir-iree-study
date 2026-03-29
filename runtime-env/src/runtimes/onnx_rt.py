@@ -1,5 +1,45 @@
+import ctypes
+import glob
+import importlib
+import os
+import site
 import numpy as np
 from typing import Dict, Any
+
+# nvidia-*-cu12 pip 패키지로 설치된 CUDA 라이브러리를 사전 로드합니다.
+# onnxruntime-gpu는 libcublasLt.so.12 등을 dlopen으로 찾는데, 이 라이브러리들이
+# Python site-packages 안에 있어 ld.so 기본 탐색 경로에 없는 경우 CUDAExecutionProvider가
+# 비활성화됩니다. 이 코드는 onnxruntime import 전에 실행해야 합니다.
+def _preload_cuda_libs() -> None:
+    _LIBS = [
+        ("nvidia.cuda_runtime.lib", "libcudart.so.12"),
+        ("nvidia.cublas.lib",       "libcublas.so.12"),
+        ("nvidia.cublas.lib",       "libcublasLt.so.12"),
+        ("nvidia.cufft.lib",        "libcufft.so.11"),
+        ("nvidia.curand.lib",       "libcurand.so.10"),
+        ("nvidia.cusolver.lib",     "libcusolver.so.11"),
+        ("nvidia.cusparse.lib",     "libcusparse.so.12"),
+        ("nvidia.nvjitlink.lib",    "libnvJitLink.so.12"),
+    ]
+    for mod_name, lib_name in _LIBS:
+        try:
+            mod = importlib.import_module(mod_name)
+            lib_dir = os.path.dirname(mod.__file__) if mod.__file__ else None
+            if lib_dir:
+                lib_path = os.path.join(lib_dir, lib_name)
+                if os.path.exists(lib_path):
+                    ctypes.CDLL(lib_path, mode=ctypes.RTLD_GLOBAL)
+        except Exception:
+            pass
+    # cudnn은 __file__이 None인 경우가 있어 glob으로 탐색
+    for sp in site.getsitepackages():
+        for lib_path in glob.glob(os.path.join(sp, "nvidia", "cudnn", "lib", "libcudnn.so.9")):
+            try:
+                ctypes.CDLL(lib_path, mode=ctypes.RTLD_GLOBAL)
+            except Exception:
+                pass
+
+_preload_cuda_libs()
 
 import onnxruntime as ort
 
@@ -19,6 +59,13 @@ class OnnxRuntime(Runtime):
         
         # ONNX Runtime의 Execution Provider 설정
         if self.device == "cuda":
+            available = ort.get_available_providers()
+            if "CUDAExecutionProvider" not in available:
+                raise RuntimeError(
+                    "CUDAExecutionProvider를 사용할 수 없습니다. "
+                    "onnxruntime-gpu 설치 여부와 CUDA 환경을 확인하세요. "
+                    f"현재 가용 Provider: {available}"
+                )
             self.providers = ['CUDAExecutionProvider', 'CPUExecutionProvider']
         else:
             self.providers = ['CPUExecutionProvider']
