@@ -54,6 +54,11 @@ class LlamaEvaluator(Evaluator):
         if num_samples == 0:
             return {"Exact Match": 0.0, "F1 Score": 0.0, "num_samples": 0}
 
+        if len(labels) != num_samples:
+            raise ValueError(
+                f"logits 배치 크기({num_samples})와 labels 길이({len(labels)})가 일치하지 않습니다."
+            )
+
         em_scores, f1_scores = [], []
 
         for i in range(num_samples):
