@@ -75,3 +75,17 @@ class DataLoader(ABC):
             np.ndarray: 모델 입력에 적합한 다차원 배열 데이터
         """
         pass
+
+    @abstractmethod
+    def load_by_index(self, index: int) -> Dict[str, Any]:
+        """
+        순서와 무관하게 특정 인덱스의 샘플 하나를 직접 반환합니다.
+        LoadGen QSL의 issue_queries 콜백처럼 랜덤 접근이 필요할 때 사용합니다.
+
+        Args:
+            index (int): 데이터셋 내 샘플의 절대 인덱스 (0-based)
+
+        Returns:
+            dict: 'input'(tensor), 'label' 등을 포함한 데이터 딕셔너리
+        """
+        pass

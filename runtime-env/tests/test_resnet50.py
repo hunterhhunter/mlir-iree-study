@@ -10,7 +10,11 @@ sys.path.append(project_root)
 from src.core.model_spec import Model_Spec, Task
 from src.core.compiled_model import CompiledModel
 from src.core.benchmarkrunner import BenchmarkRunner
-from src.dataloader import ImageClassificationLoader
+from src.dataloader import (
+    ImageClassificationLoader,
+    MLPerfResNet50Preprocess,
+    DirectResizePreprocess,
+)
 from src.runtimes import OnnxRuntime
 from src.evaluators import ImageClassificationEvaluator
 
@@ -115,11 +119,16 @@ def main():
     )
     
     # 3. 객체 주입 및 초기화
+    cache_dir = os.path.join(project_root, 'datasets', 'imagenet_1k', '.cache_npy')
     loader = ImageClassificationLoader(
         model_spec=resnet_spec,
         dataset_path=dataset_path,
         image_dir=image_dir,
-        label_file=label_file
+        label_file=label_file,
+        # MLPerf 참조 알고리즘: short-side 256 resize → center crop 224
+        preprocess_strategy=MLPerfResNet50Preprocess(),
+        # .npy 디스크 캐시 활성화 (반복 실행 시 전처리 비용 제거)
+        cache_dir=cache_dir,
     )
     
     runtime = OnnxRuntime(device="cpu")
