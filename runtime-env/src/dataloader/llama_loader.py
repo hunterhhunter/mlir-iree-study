@@ -174,8 +174,10 @@ class LlamaLoader(DataLoader):
 
         tensors = self._load_or_tokenize(sample)
         return {
-            "input_ids":      tensors["input_ids"],
-            "attention_mask": tensors["attention_mask"],
+            "input": {
+                "input_ids":      tensors["input_ids"],
+                "attention_mask": tensors["attention_mask"],
+            },
             "label": {
                 "id":                sample["qa_id"],
                 "answers":           sample["answers"],
@@ -206,8 +208,10 @@ class LlamaLoader(DataLoader):
         sample = self.samples[index]
         tensors = self._load_or_tokenize(sample)
         return {
-            "input_ids":      tensors["input_ids"],
-            "attention_mask": tensors["attention_mask"],
+            "input": {
+                "input_ids":      tensors["input_ids"],
+                "attention_mask": tensors["attention_mask"],
+            },
             "label": {
                 "id":                sample["qa_id"],
                 "answers":           sample["answers"],

@@ -179,15 +179,16 @@ class TestLlamaLoader:
         )
         sample = loader.load_single()
 
-        assert "input_ids"      in sample
-        assert "attention_mask" in sample
+        assert "input"          in sample
+        assert "input_ids"      in sample["input"]
+        assert "attention_mask" in sample["input"]
         assert "label"          in sample
         assert "qa_id"          in sample
 
-        assert sample["input_ids"].shape      == (1, 128)
-        assert sample["attention_mask"].shape == (1, 128)
-        assert sample["input_ids"].dtype      == np.int64
-        assert sample["attention_mask"].dtype == np.int64
+        assert sample["input"]["input_ids"].shape      == (1, 128)
+        assert sample["input"]["attention_mask"].shape == (1, 128)
+        assert sample["input"]["input_ids"].dtype      == np.int64
+        assert sample["input"]["attention_mask"].dtype == np.int64
 
     def test_load_single_increments_index(self, tmp_path):
         """load_single() 호출 시 current_idx가 증가하는지 확인합니다."""
@@ -295,8 +296,8 @@ class TestLlamaLoader:
         strategy.tokenize.reset_mock()
         sample2 = loader.load_by_index(0)
 
-        np.testing.assert_array_equal(sample1["input_ids"], sample2["input_ids"])
-        np.testing.assert_array_equal(sample1["attention_mask"], sample2["attention_mask"])
+        np.testing.assert_array_equal(sample1["input"]["input_ids"], sample2["input"]["input_ids"])
+        np.testing.assert_array_equal(sample1["input"]["attention_mask"], sample2["input"]["attention_mask"])
         # 캐시 히트이므로 tokenize가 호출되지 않아야 함
         strategy.tokenize.assert_not_called()
 
