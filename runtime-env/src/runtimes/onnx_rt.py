@@ -58,6 +58,13 @@ class OnnxRuntime(Runtime):
         self.device = runtime_options.get("device", "cpu")
         
         # ONNX Runtime의 Execution Provider 설정
+        _SUPPORTED_DEVICES = {"cpu", "cuda"}
+        if self.device not in _SUPPORTED_DEVICES:
+            raise ValueError(
+                f"지원하지 않는 device입니다: '{self.device}'. "
+                f"지원 목록: {sorted(_SUPPORTED_DEVICES)}"
+            )
+
         if self.device == "cuda":
             available = ort.get_available_providers()
             if "CUDAExecutionProvider" not in available:
