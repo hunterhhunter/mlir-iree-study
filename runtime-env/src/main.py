@@ -1,7 +1,6 @@
 import os
 import sys
 import argparse
-import onnx
 from pathlib import Path
 
 # 프로젝트 루트 경로 추가 (sys.path)
@@ -10,6 +9,7 @@ if project_root not in sys.path:
     sys.path.append(project_root)
 
 from src.core.model_spec import Model_Spec, Task
+from src.core.model_profiles import create_model_spec
 from src.core.compiled_model import CompiledModel
 from src.core.benchmarkrunner import BenchmarkRunner
 
@@ -19,31 +19,6 @@ from src.evaluators import create_evaluator
 from src.runtimes import create_runtime
 # from src.runtimes.iree_rt import IREERuntime  # 향후 IREE 백엔드 추가 시 주석 해제
 
-def _parse_onnx_io_names(onnx_path):
-    """지정된 ONNX 모델을 로드하여 Input/Output 텐서 이름을 자동 추출합니다."""
-    model = onnx.load(onnx_path)
-    input_name = model.graph.input[0].name
-    output_name = model.graph.output[0].name
-    return input_name, output_name
-
-def create_model_spec(model_name: str, onnx_path: str, task: Task = Task.IMAGE_CLASSIFICATION):
-    """ONNX 바이너리를 분석하여 동적으로 모델 명세서(Spec)를 생성하는 Factory 함수"""
-    input_n, output_n = _parse_onnx_io_names(onnx_path)
-    print(f"[Factory] Detected ONNX I/O -> Input: '{input_n}', Output: '{output_n}'")
-    
-    # 텐서 형태 (입력/출력) 지정
-    input_shape = (1, 3, 640, 640) if task == Task.OBJECT_DETECTION else (1, 3, 224, 224)
-    output_shape = (1, 25200, 85) if task == Task.OBJECT_DETECTION else (1, 1000)
-    
-    spec = Model_Spec(
-        name=model_name,
-        task=task,
-        input_shapes={input_n: input_shape},
-        input_dtype={input_n: "float32"},
-        output_shapes={output_n: output_shape},
-        model_paths={"onnx": onnx_path}
-    )
-    return spec
 
 def main():
     parser = argparse.ArgumentParser(description="Unified BenchmarkRunner CLI Orchestrator")
@@ -52,7 +27,7 @@ def main():
     parser.add_argument("--dataset", type=str, required=True, help="평가용 데이터셋 최상위 디렉토리 (예: datasets/imagenet_1k 또는 datasets/coco128)")
     parser.add_argument("--image-dir", type=str, default="", help="(옵션) 데이터셋 내 이미지 하위 폴더 경로")
     parser.add_argument("--label-dir", type=str, default="", help="(옵션) 데이터셋 내 라벨 하위 폴더 경로")
-    parser.add_argument("--task", type=str, default="classification", choices=["classification", "detection"], help="평가할 태스크 유형 (기본: classification)")
+    parser.add_argument("--task", type=str, default="classification", choices=["classification", "detection", "nlp_classification", "nlp_generation"], help="평가할 태스크 유형 (기본: classification)")
     parser.add_argument("--layout", type=str, default="NCHW", choices=["NCHW", "NHWC"], help="모델 텐서 레이아웃 (기본: NCHW)")
     parser.add_argument("--backend", type=str, default="onnxruntime", choices=["onnxruntime", "iree"], help="추론을 실행할 백엔드 (기본: onnxruntime)")
     parser.add_argument("--device", type=str, default="cpu", help="추론 장치 (예: cpu, cuda, 기본: cpu)")
@@ -71,37 +46,23 @@ def main():
         print(f"[Error] 모델 파일을 찾을 수 없습니다: {args.onnx}")
         sys.exit(1)
         
-    task_enum = Task.OBJECT_DETECTION if args.task == "detection" else Task.IMAGE_CLASSIFICATION
+    TASK_MAP = {
+        "classification": Task.IMAGE_CLASSIFICATION,
+        "detection": Task.OBJECT_DETECTION,
+        "nlp_classification": Task.NLP_CLASSIFICATION,
+        "nlp_generation": Task.NLP_GENERATION
+    }
+    task_enum = TASK_MAP.get(args.task, Task.IMAGE_CLASSIFICATION)
     
-    # Convention over Configuration (CoC): 사용자가 귀찮지 않게 스마트 디폴트 탑재
+    # 0. DataLoader 공통 인터페이스 규약 및 CoC 해소 (Resolver)
+    from src.utils.dataset_resolver import resolve_dataset_paths
+    image_dir, label_path = resolve_dataset_paths(task_enum, args.dataset, args.image_dir, args.label_dir)
+    
     loader_kwargs = {}
-    
-    if task_enum == Task.OBJECT_DETECTION:
-        # 1. 만약 사용자가 파라미터를 줬다면 최우선 적용 (자유도 보장)
-        if args.image_dir and args.label_dir:
-            loader_kwargs["image_dir"] = os.path.join(args.dataset, args.image_dir)
-            loader_kwargs["label_dir"] = os.path.join(args.dataset, args.label_dir)
-        else:
-            # 2. 파라미터가 비어 있다면 COCO 표준 폴더 자동 후각(스니핑)
-            img_val = os.path.join(args.dataset, "images", "val2017")
-            img_train = os.path.join(args.dataset, "images", "train2017")
-            if os.path.exists(img_val):
-                loader_kwargs["image_dir"] = img_val
-                loader_kwargs["label_dir"] = os.path.join(args.dataset, "labels", "val2017")
-            elif os.path.exists(img_train):
-                loader_kwargs["image_dir"] = img_train
-                loader_kwargs["label_dir"] = os.path.join(args.dataset, "labels", "train2017")
-            else:
-                print(f"[Error] COCO 표준 구조(val2017, train2017)를 찾을 수 없습니다. --image-dir 와 --label-dir 를 직접 입력하세요.")
-                sys.exit(1)
-    else:
-        # 분류(Classification) 태스크
-        if args.image_dir and args.label_dir:
-            loader_kwargs["image_dir"] = os.path.join(args.dataset, args.image_dir)
-            loader_kwargs["label_file"] = os.path.join(args.dataset, args.label_dir)
-        else:
-            loader_kwargs["image_dir"] = os.path.join(args.dataset, "val")
-            loader_kwargs["label_file"] = os.path.join(args.dataset, "val_labels.txt")
+    if image_dir:
+        loader_kwargs["image_dir"] = image_dir
+    if label_path:
+        loader_kwargs["label_path"] = label_path
     
     # 1. Spec & Artifact 생성
     try:
