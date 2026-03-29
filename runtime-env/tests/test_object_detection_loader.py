@@ -1,98 +1,103 @@
-import os
 import sys
+import os
 import numpy as np
+from PIL import Image
 
-# 프로젝트 루트 경로를 sys.path에 추가 (src 패키지 인식 용이)
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-if project_root not in sys.path:
-    sys.path.append(project_root)
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from src.core.model_spec import Model_Spec, Task
-from src.dataloader import create_dataloader
+from src.dataloader.object_detection_loader import ObjectDetectionLoader
 
-def main():
-    print("="*60)
-    print(" Object Detection DataLoader Test ")
-    print("="*60)
-    
-    # 1. 테스트용 Model_Spec 생성 (예: YOLOv8 입력 사이즈 640x640)
-    # 파일이 명시되지 않은 Dummy 스펙입니다.
-    dummy_spec = Model_Spec(
-        name="dummy_yolov8",
+import sys
+import os
+import numpy as np
+from PIL import Image
+import pytest
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+from src.core.model_spec import Model_Spec, Task
+from src.dataloader.object_detection_loader import ObjectDetectionLoader
+
+@pytest.fixture
+def dummy_coco_dir(tmp_path):
+    """Pytest fixture to create robust temporary Coco images and labels for testing."""
+    img_dir = tmp_path / "images" / "val2017"
+    label_dir = tmp_path / "labels" / "val2017"
+    img_dir.mkdir(parents=True, exist_ok=True)
+    label_dir.mkdir(parents=True, exist_ok=True)
+
+    # 1. Normal data
+    img_path1 = img_dir / "000000000139.jpg"
+    Image.new('RGB', (640, 640), color='black').save(img_path1)
+
+    label_path1 = label_dir / "000000000139.txt"
+    label_path1.write_text("0 0.5 0.5 0.2 0.2\n2 0.2 0.2 0.05 0.05\n")
+
+    # 2. Edge case data (Bad formatting)
+    img_path2 = img_dir / "000000000140.jpg"
+    Image.new('RGB', (640, 640), color='white').save(img_path2)
+
+    label_path2 = label_dir / "000000000140.txt"
+    label_path2.write_text("class_id cx cy w h\n0.0 0.1 0.1 0.1 0.1\nwrong data format\n3.0 0.8 0.8 0.1 0.1\n")
+
+    return tmp_path
+
+def test_object_detection_loader_nchw(dummy_coco_dir):
+    """Test object detection loader defaults to standard NCHW padding and parsing."""
+    spec = Model_Spec(
+        name="yolov5m",
         task=Task.OBJECT_DETECTION,
-        input_shapes={"images": (1, 3, 640, 640)},  # Object detection 스탠다드
+        input_shapes={"images": (1, 3, 640, 640)},
         input_dtype={"images": "float32"},
-        output_shapes={"output0": (1, 84, 8400)},
-        model_paths={}
+        output_shapes={"output0": (1, 25200, 85)}
     )
-    
-    # 2. 데이터셋 로컬 경로 설정 (이전 단계에서 다운로드 받은 datasets/coco)
-    dataset_path = os.path.join(project_root, "datasets", "coco")
-    
-    if not os.path.exists(dataset_path):
-        print(f"[!] COCO 데이터셋 폴더를 찾을 수 없습니다: {dataset_path}")
-        print("[!] 먼저 datasets/load_coco.py 를 실행해주세요.")
-        return
 
-    print(f"[*] Dataset Path: {dataset_path}")
-    print(f"[*] Target Input Shape (Resized): {dummy_spec.input_shapes['images']}")
+    img_dir = str(dummy_coco_dir / "images" / "val2017")
+    label_dir = str(dummy_coco_dir / "labels" / "val2017")
 
-    # 3. Factory 패턴을 통한 DataLoader 인스턴스화
-    try:
-        loader = create_dataloader(
-            model_spec=dummy_spec,
-            dataset_path=dataset_path
-        )
-        print("[+] DataLoader 생성 및 COCO JSON 파싱 성공!")
-    except Exception as e:
-        print(f"[!] DataLoader 생성 실패: {e}")
-        return
+    loader = ObjectDetectionLoader(
+        spec, dataset_path=str(dummy_coco_dir), image_dir=img_dir, label_dir=label_dir,
+        mean=[0.0, 0.0, 0.0], std=[1.0, 1.0, 1.0]
+    )
 
-    # 4. 메타데이터 파싱 확인
-    meta = loader.get_metadata()
-    print("\n[1. Metadata Parsing]")
-    for k, v in meta.items():
-        print(f"  - {k}: {v}")
+    batch_samples = loader.load_batch(2)
+    assert len(batch_samples) == 2, "Batch loader did not return exactly 2 samples."
 
-    # 5. 단일 데이터 로드(load_single) 테스트
-    print("\n[2. Testing load_single()]")
-    try:
-        single_data = loader.load_single()
-        
-        img_path = single_data['img_path']
-        original_size = single_data['original_size']
-        tensor_shape = single_data['input'].shape
-        targets = single_data['targets']
-        boxes = targets['boxes']
-        labels = targets['labels']
-        
-        print(f"  - Image Path: {img_path}")
-        print(f"  - Original Size (H, W): {original_size}")
-        print(f"  - Preprocessed Tensor Shape: {tensor_shape} (Expected: (3, 640, 640))")
-        print(f"  - Bounding Boxes count: {len(boxes)}")
-        
-        if len(boxes) > 0:
-            print(f"  - First Box (Scaled coords [x, y, w, h]): {boxes[0]}")
-            print(f"  - First Box Label (Category ID): {labels[0]}")
-    except Exception as e:
-        print(f"[!] 단일 데이터 로드(load_single) 에러 발생: {e}")
+    for sample in batch_samples:
+        img_path = sample.get("img_path", "unknown")
+        tensor = sample["input"]
+        label = sample["label"]
 
-    # 6. 배치 데이터 로드(load_batch) 테스트
-    print("\n[3. Testing load_batch(3)]")
-    try:
-        batch_data = loader.load_batch(batch_size=3)
-        print(f"  - Batch size returned: {len(batch_data)}")
-        for i, item in enumerate(batch_data):
-            num_boxes = len(item['targets']['boxes'])
-            base_name = os.path.basename(item['img_path'])
-            orig_size = item['original_size']
-            print(f"    [{i+1}] File: {base_name} | Original: {orig_size} | BBox Count: {num_boxes}")
-    except Exception as e:
-        print(f"[!] 배치 데이터 로드(load_batch) 에러 발생: {e}")
+        assert isinstance(tensor, np.ndarray) and isinstance(label, np.ndarray), "Output must be strictly numpy arrays."
+        assert tensor.shape == (3, 640, 640), "NCHW shape mismatch in output tensor."
 
-    print("\n" + "="*60)
-    print(" Component Test Completed! ")
-    print("="*60)
+        if "139" in img_path:
+            assert label.shape == (2, 5), "Normal label shape mismatch."
+            assert label[0][0] == 0.0, "Class ID parsing error."
+        elif "140" in img_path:
+            assert label.shape == (2, 5), "Edge case parsing failed to ignore invalid string lines."
+            assert label[0][0] == 0.0 and label[1][0] == 3.0, "Float class ID parsing error on edge case."
 
-if __name__ == "__main__":
-    main()
+def test_object_detection_loader_nhwc(dummy_coco_dir):
+    """Test object detection loader supports custom NHWC layout dynamically."""
+    spec = Model_Spec(
+        name="yolov5_nhwc_custom",
+        task=Task.OBJECT_DETECTION,
+        input_shapes={"images": (1, 640, 640, 3)},
+        input_dtype={"images": "float32"},
+        output_shapes={"output0": (1, 25200, 85)}
+    )
+
+    img_dir = str(dummy_coco_dir / "images" / "val2017")
+    label_dir = str(dummy_coco_dir / "labels" / "val2017")
+
+    loader = ObjectDetectionLoader(
+        spec, dataset_path=str(dummy_coco_dir), image_dir=img_dir, label_dir=label_dir,
+        layout="NHWC"
+    )
+
+    sample = loader.load_single()
+    tensor = sample["input"]
+
+    assert tensor.shape == (640, 640, 3), "NHWC logic failed to transpose the tensor correctly."

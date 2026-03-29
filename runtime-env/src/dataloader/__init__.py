@@ -9,6 +9,13 @@ from ..core.model_spec import Model_Spec, Task
 from .base import DataLoader
 from .image_classification_loader import ImageClassificationLoader
 from .object_detection_loader import ObjectDetectionLoader
+from .llama_loader import LlamaLoader
+from .preprocess_strategies import (
+    PreprocessStrategy,
+    MLPerfResNet50Preprocess,
+    DirectResizePreprocess,
+    SQuADPreprocessStrategy,
+)
 
 def create_dataloader(model_spec: Model_Spec, **kwargs) -> DataLoader:
     """
@@ -33,8 +40,8 @@ def create_dataloader(model_spec: Model_Spec, **kwargs) -> DataLoader:
         return ImageClassificationLoader(model_spec, **kwargs)
     elif task == Task.OBJECT_DETECTION:
         return ObjectDetectionLoader(model_spec, **kwargs)
-        
-    # 추후 NLP 등의 Task 로더가 추가되면 확장
+    elif task == Task.NLP_GENERATION:
+        return LlamaLoader(model_spec, **kwargs)
     else:
         raise ValueError(f"현재 '{task.name}' Task를 지원하는 DataLoader가 구현되어 있지 않습니다.")
 
@@ -42,5 +49,10 @@ __all__ = [
     "DataLoader",
     "ImageClassificationLoader",
     "ObjectDetectionLoader",
-    "create_dataloader"
+    "LlamaLoader",
+    "create_dataloader",
+    "PreprocessStrategy",
+    "MLPerfResNet50Preprocess",
+    "DirectResizePreprocess",
+    "SQuADPreprocessStrategy",
 ]

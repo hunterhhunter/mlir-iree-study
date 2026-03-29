@@ -7,11 +7,13 @@ ENV/
 __pycache__/
 *.py[cod]
 *$py.class
+.pytest_cache/
 
 # IREE Artifacts
 *.vmfb
 *.mlir
 *.onnx
+*.pt
 
 # Models
 models/
@@ -37,3 +39,5 @@ datasets/*
 GEMINI.md
 plan.md
 scratchpad.md
+CLAUDE.md
+.gstack/
