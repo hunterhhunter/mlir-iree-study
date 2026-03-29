@@ -10,7 +10,7 @@ Image Classification DataLoader
 import os
 import json
 from pathlib import Path
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Tuple
 import numpy as np
 from PIL import Image
 
@@ -29,27 +29,16 @@ IMAGENET_STD  = (0.229, 0.224, 0.225)
 
 class ImageClassificationLoader(DataLoader):
     def __init__(self, model_spec: Model_Spec, **kwargs):
-        """
-        초기화 메서드.
-
-        Args:
-            model_spec (Model_Spec): 코어 스펙 규격 인스턴스.
-            **kwargs:
-                - dataset_path (str)            : 데이터셋 루트 디렉토리
-                - image_dir (str)               : 이미지 파일 디렉토리 (dataset_path/images 폴백)
-                - label_file (str)              : 레이블 파일 경로 (json or txt)
-                - mean (tuple/list)             : 커스텀 정규화 평균값
-                - std  (tuple/list)             : 커스텀 정규화 표준편차
-                - preprocess_strategy           : PreprocessStrategy 구현 인스턴스
-                                                  (기본값: MLPerfResNet50Preprocess)
-                - cache_dir (str)               : .npy 캐시 디렉토리 (None이면 캐싱 비활성)
-        """
+        """초기화 메서드."""
         self.model_spec = model_spec
 
-        # 1. 경로 설정
-        self.base_path  = kwargs.get("dataset_path", "./data/dummy_dataset")
-        self.image_dir  = kwargs.get("image_dir",  os.path.join(self.base_path, "images"))
-        self.label_file = kwargs.get("label_file", os.path.join(self.base_path, "labels.json"))
+        # 1. 원칙 준수: 절대 경로 필수 주입 (스니핑 불가)
+        self.base_path = kwargs.get("dataset_path", "./data/dummy_dataset")
+        self.image_dir = kwargs.get("image_dir")
+        self.label_file = kwargs.get("label_path")
+        
+        if not self.image_dir or not self.label_file:
+            raise ValueError("[ImageClassificationLoader] image_dir 또는 label_path가 명시적으로 제공되지 않았습니다.")
 
         # 2. 이미지 파일 목록 & 레이블 맵 구성
         self.image_files: List[str] = []
@@ -57,6 +46,7 @@ class ImageClassificationLoader(DataLoader):
 
         if os.path.exists(self.image_dir):
             self.image_files = sorted(os.listdir(self.image_dir))
+
 
         if os.path.exists(self.label_file):
             if self.label_file.endswith(".json"):
@@ -109,7 +99,6 @@ class ImageClassificationLoader(DataLoader):
             "preprocess_strategy", MLPerfResNet50Preprocess()
         )
 
-        # 6. .npy 디스크 캐시 설정 (MLPerf 캐싱 패턴 채택)
         self.cache_dir: Optional[str] = kwargs.get("cache_dir", None)
         if self.cache_dir:
             os.makedirs(self.cache_dir, exist_ok=True)
@@ -118,12 +107,12 @@ class ImageClassificationLoader(DataLoader):
     # ------------------------------------------------------------------
     # Private helpers
     # ------------------------------------------------------------------
-
+    
     def _try_load_preprocessor_config(self):
-        """모델 경로 인근의 preprocessor_config.json을 탐색하여 mean/std를 반환."""
+        """모델 원본 서명(Spec) 경로 인근의 preprocessor_config.json을 탐색하여 mean/std를 반환."""
         if "onnx" not in self.model_spec.model_paths:
             return None, None
-        onnx_path   = self.model_spec.model_paths["onnx"]
+        onnx_path = self.model_spec.model_paths["onnx"]
         config_path = os.path.join(os.path.dirname(onnx_path), "preprocessor_config.json")
         if not os.path.exists(config_path):
             return None, None
