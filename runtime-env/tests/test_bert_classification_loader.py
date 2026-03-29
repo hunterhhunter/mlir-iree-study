@@ -97,3 +97,28 @@ def test_bert_loader_load_single_raises_stop_iteration(dummy_bert_spec, tmp_path
     # 소진 후 예외 발생 검증
     with pytest.raises(StopIteration, match="모든 샘플이 소진되었습니다"):
         loader.load_single()
+
+
+def test_bert_loader_load_by_index(dummy_bert_spec, tmp_path):
+    """
+    [TDD Red Phase] 무작위 인덱스 접근(Random Access) 기능 검증
+    MLPerf QSL 로직(issue_queries) 대응을 위한 load_by_index()의 정상 작동 및 범위 초과 예외(IndexError) 검증.
+    """
+    total_samples = 15
+    dataset_dir = create_mock_dataset(tmp_path, total_samples)
+    
+    # TDD 원칙에 의해, 현재 구동 시 TypeError(추상 메서드 누락) 발생 예정
+    loader = BertClassificationLoader(model_spec=dummy_bert_spec, dataset_path=dataset_dir)
+    
+    # 1. 정상 인덱스 단일 조회 검증 (Random Access)
+    sample_7 = loader.load_by_index(7)
+    assert sample_7["input"]["input_ids"].shape == (128,)
+    assert sample_7["input"]["attention_mask"].shape == (128,)
+    assert sample_7["label"].shape == ()  # 스칼라 정수 라벨
+    
+    # 2. 범위 외부(Out of Bounds) 접근 시 IndexError 발생 검증
+    with pytest.raises(IndexError, match="out of bounds|초과"):
+        loader.load_by_index(15)  # 총 15개이므로 0~14까지만 허용됨
+        
+    with pytest.raises(IndexError, match="out of bounds|초과"):
+        loader.load_by_index(-1)
