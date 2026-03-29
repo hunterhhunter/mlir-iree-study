@@ -84,3 +84,4 @@ typing-extensions==4.15.0
 urllib3==2.6.3
 xxhash==3.6.0
 yarl==1.23.0
+pytest==8.3.4
