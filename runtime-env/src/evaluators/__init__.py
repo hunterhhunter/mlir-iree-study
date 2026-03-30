@@ -10,6 +10,7 @@ from .base import Evaluator
 from .image_classification_evaluator import ImageClassificationEvaluator
 from .llama_evaluator import LlamaEvaluator
 from .object_detection_evaluator import ObjectDetectionEvaluator
+from .bert_classification_evaluator import BertClassificationEvaluator
 
 def create_evaluator(model_spec: Model_Spec, **kwargs) -> Evaluator:
     """
@@ -38,6 +39,9 @@ def create_evaluator(model_spec: Model_Spec, **kwargs) -> Evaluator:
     elif task == Task.OBJECT_DETECTION:
         return ObjectDetectionEvaluator(**kwargs)
 
+    elif task == Task.NLP_CLASSIFICATION:
+        return BertClassificationEvaluator(**kwargs)
+
     else:
         raise ValueError(f"현재 '{task.name}' Task를 지원하는 Evaluator가 구현되어 있지 않습니다.")
 
@@ -46,5 +50,6 @@ __all__ = [
     "ImageClassificationEvaluator",
     "LlamaEvaluator",
     "ObjectDetectionEvaluator",
+    "BertClassificationEvaluator",
     "create_evaluator"
 ]

@@ -46,7 +46,9 @@ def main():
     
     # 2. 객체 인스턴스화 (Factory 기반)
     print("\n---------- [2단계: 팩토리(Factory) 기반 컴포넌트 생성] ----------")
-    loader = create_dataloader(model_spec=det_spec, dataset_path=dataset_path)
+    from src.utils.dataset_resolver import resolve_dataset_paths
+    image_dir, label_path = resolve_dataset_paths(det_spec.task, dataset_path, "", "")
+    loader = create_dataloader(model_spec=det_spec, dataset_path=dataset_path, image_dir=image_dir, label_path=label_path)
     print(f"[+] DataLoader 생성 완료 (Loaded {loader.total_samples} samples)")
     
     compiled_model = CompiledModel(spec=det_spec, backend_name="onnx", artifact_path=Path(onnx_model_path))

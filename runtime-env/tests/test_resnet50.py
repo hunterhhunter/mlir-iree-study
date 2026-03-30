@@ -124,7 +124,7 @@ def main():
         model_spec=resnet_spec,
         dataset_path=dataset_path,
         image_dir=image_dir,
-        label_file=label_file,
+        label_path=label_file,
         # MLPerf 참조 알고리즘: short-side 256 resize → center crop 224
         preprocess_strategy=MLPerfResNet50Preprocess(),
         # .npy 디스크 캐시 활성화 (반복 실행 시 전처리 비용 제거)

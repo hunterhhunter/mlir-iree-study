@@ -15,25 +15,18 @@ from ..core.model_spec import Model_Spec
 
 class ObjectDetectionLoader(DataLoader):
     def __init__(self, model_spec: Model_Spec, **kwargs):
-        """
-        초기화 메서드.
-        
-        Args:
-            model_spec (Model_Spec): 코어 스펙 규격 인스턴스.
-            **kwargs:
-                - 'dataset_path': 데이터셋 로컬 루트 디렉토리
-                - 'image_dir': 이미지 파일 디렉토리
-                - 'label_dir': YOLO 형식의 TXT 라벨 디렉토리
-                - 'mean': 정규화 평균값 (기본값: [0, 0, 0])
-                - 'std': 정규화 표준편차 (기본값: [1, 1, 1])
-        """
+        """초기화 메서드."""
         self.model_spec = model_spec
-        
-        # 1. 파일 경로 설정 및 초기화
         self.base_path = kwargs.get("dataset_path", "./data/coco128")
-        self.image_dir = kwargs.get("image_dir", os.path.join(self.base_path, "images", "train2017"))
-        self.label_dir = kwargs.get("label_dir", os.path.join(self.base_path, "labels", "train2017"))
         
+        # 1. 원칙 준수: 절대 경로 필수 주입 (스니핑 불가)
+        self.image_dir = kwargs.get("image_dir")
+        self.label_dir = kwargs.get("label_path")
+        
+        if not self.image_dir or not self.label_dir:
+            raise ValueError("[ObjectDetectionLoader] image_dir 또는 label_path가 명시적으로 제공되지 않았습니다.")
+        
+        # 2. 이미지 파일 목록 로드
         self.image_files: List[str] = []
         if os.path.exists(self.image_dir):
             self.image_files = sorted([
@@ -44,10 +37,11 @@ class ObjectDetectionLoader(DataLoader):
         self.total_samples = len(self.image_files)
         self.current_idx = 0
         
-        # 2. 모델 정보에 기반한 내부 속성 구성 
+        # 3. 모델 정보 기반 속성 파싱
         self.target_hw = self._parse_target_shape(kwargs)
         self.mean, self.std = self._setup_normalization(kwargs)
         self.layout = kwargs.get("layout", "NCHW").upper()
+
 
     def _parse_target_shape(self, kwargs: Dict[str, Any]) -> Tuple[int, int]:
         """Model_Spec에서 입력 차원(H, W)을 안전하게 추출하는 헬퍼 메서드"""

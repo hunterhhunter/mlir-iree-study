@@ -28,10 +28,19 @@ class ImageClassificationEvaluator(Evaluator):
             logits = logits[..., 1:]
 
         
-        # 2. 정답지(labels) 타입 검증 및 치환
-        labels = result.labels
-        if not isinstance(labels, np.ndarray):
-            labels = np.array(labels)
+        # 2. 정답지(labels) 1D 병합 위임 처리 (SOLID)
+        raw_labels = result.labels
+        labels = []
+        if isinstance(raw_labels, list):
+            for batch in raw_labels:
+                if isinstance(batch, (list, np.ndarray)):
+                    labels.extend(batch)
+                else:
+                    labels.append(batch)
+        else:
+            labels = raw_labels
+            
+        labels = np.array(labels)
             
         metrics["Total Samples"] = labels.shape[0]
 

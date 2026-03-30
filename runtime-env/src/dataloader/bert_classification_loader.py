@@ -95,3 +95,18 @@ class BertClassificationLoader(DataLoader):
     def preprocess(self, raw_input: Any) -> np.ndarray:
         # AOT 로드 방식이므로 런타임 전처리는 절대 수행하지 않음 (O(1) 원칙 고수)
         return raw_input
+
+    def load_by_index(self, index: int) -> Dict[str, Any]:
+        """
+        [MLPerf QSL 무작위 쿼리 전용] 
+        특정 절대 인덱스의 데이터를 mmap 페이징 기술로 O(1) 슬라이싱하여 즉시 반환.
+        다중 스레드(Worker)의 동시다발적 랜덤 엑세스 요청에도 충돌하지 않는 무상태(Stateless) 메서드.
+        """
+        if index < 0 or index >= self.total_samples:
+            raise IndexError(f"요청 인덱스 {index} 범위 초과 (허용: 0 ~ {self.total_samples - 1})")
+            
+        return self._build_payload(
+            self.input_ids[index],
+            self.attention_mask[index],
+            self.labels[index]
+        )

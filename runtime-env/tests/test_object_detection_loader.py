@@ -57,7 +57,7 @@ def test_object_detection_loader_nchw(dummy_coco_dir):
     label_dir = str(dummy_coco_dir / "labels" / "val2017")
 
     loader = ObjectDetectionLoader(
-        spec, dataset_path=str(dummy_coco_dir), image_dir=img_dir, label_dir=label_dir,
+        spec, dataset_path=str(dummy_coco_dir), image_dir=img_dir, label_path=label_dir,
         mean=[0.0, 0.0, 0.0], std=[1.0, 1.0, 1.0]
     )
 
@@ -93,7 +93,7 @@ def test_object_detection_loader_nhwc(dummy_coco_dir):
     label_dir = str(dummy_coco_dir / "labels" / "val2017")
 
     loader = ObjectDetectionLoader(
-        spec, dataset_path=str(dummy_coco_dir), image_dir=img_dir, label_dir=label_dir,
+        spec, dataset_path=str(dummy_coco_dir), image_dir=img_dir, label_path=label_dir,
         layout="NHWC"
     )
 

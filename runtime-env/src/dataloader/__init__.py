@@ -10,6 +10,7 @@ from .base import DataLoader
 from .image_classification_loader import ImageClassificationLoader
 from .object_detection_loader import ObjectDetectionLoader
 from .llama_loader import LlamaLoader
+from .bert_classification_loader import BertClassificationLoader
 from .preprocess_strategies import (
     PreprocessStrategy,
     MLPerfResNet50Preprocess,
@@ -42,6 +43,8 @@ def create_dataloader(model_spec: Model_Spec, **kwargs) -> DataLoader:
         return ObjectDetectionLoader(model_spec, **kwargs)
     elif task == Task.NLP_GENERATION:
         return LlamaLoader(model_spec, **kwargs)
+    elif task == Task.NLP_CLASSIFICATION:
+        return BertClassificationLoader(model_spec, **kwargs)
     else:
         raise ValueError(f"현재 '{task.name}' Task를 지원하는 DataLoader가 구현되어 있지 않습니다.")
 
@@ -50,6 +53,7 @@ __all__ = [
     "ImageClassificationLoader",
     "ObjectDetectionLoader",
     "LlamaLoader",
+    "BertClassificationLoader",
     "create_dataloader",
     "PreprocessStrategy",
     "MLPerfResNet50Preprocess",
