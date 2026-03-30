@@ -16,10 +16,9 @@ __pycache__/
 *.pt
 
 # Models
-models/
+models/*
+!models/*.py
 !models/README.md
-!models/export_onnx_optimum.py
-!models/download_model_from_huggingface.py
 
 # Logs & Profiling
 logs/
