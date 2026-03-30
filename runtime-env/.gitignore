@@ -35,6 +35,7 @@ datasets/*
 .DS_Store
 
 #Agent Workspace
+plan/
 .agent/
 GEMINI.md
 plan.md

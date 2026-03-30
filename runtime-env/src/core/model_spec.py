@@ -15,6 +15,7 @@ class Task(Enum):
     SPEECH_RECOGNITION = auto()
     MATMUL = auto()
     CONV2D = auto()
+    TIME_SERIES_FORECASTING = auto()
 
 @dataclass(frozen=True)
 class Model_Spec:
