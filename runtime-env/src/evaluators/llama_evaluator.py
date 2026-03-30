@@ -183,6 +183,10 @@ class LlamaEvaluator(Evaluator):
         pred_tokens = self._normalize_answer(pred).split()
         gold_tokens = self._normalize_answer(gold).split()
 
+        # 둘 다 빈 문자열이면 완벽한 일치 (unanswerable 질문을 올바르게 예측한 경우)
+        if not pred_tokens and not gold_tokens:
+            return 1.0
+
         common = Counter(pred_tokens) & Counter(gold_tokens)
         num_common = sum(common.values())
 
