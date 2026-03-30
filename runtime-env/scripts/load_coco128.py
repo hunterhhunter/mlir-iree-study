@@ -11,8 +11,16 @@ def main():
     zip_path = os.path.join(datasets_dir, "coco128.zip")
     
     print(f"[*] Downloading COCO128 from {url} to {datasets_dir}...")
+    
+    def reporthook(block_num, block_size, total_size):
+        fetched = block_num * block_size
+        if total_size > 0:
+            percent = min(100, fetched * 100 // total_size)
+            print(f"\rDownloading... {percent}% ({fetched/(1024*1024):.1f}MB / {total_size/(1024*1024):.1f}MB)", end="")
+
     try:
-        urllib.request.urlretrieve(url, zip_path)
+        urllib.request.urlretrieve(url, zip_path, reporthook)
+        print("\n[+] Download complete!")
     except Exception as e:
         print(f"[!] 다운로드 실패: {e}")
         return
