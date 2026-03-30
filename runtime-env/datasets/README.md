@@ -17,10 +17,7 @@ PatchTST 등 시계열 예측 모델 평가를 위해서는 논문에서 사용�
 직접 wget 명령어를 이용해 csv 원본 파일을 확보합니다.
 
 - **ETTh1 다운로드**:
-```bash
-mkdir -p datasets/etth1
-wget -O datasets/etth1/ETTh1.csv https://raw.githubusercontent.com/zhouhaoyi/ETDataset/main/ETT-small/ETTh1.csv
-```
+- [링크](https://github.com/zhouhaoyi/ETDataset/tree/main) 에 존재
 
 ## 📂 디렉토리 구조 (Directory Structure)
 
