@@ -1,50 +1,69 @@
 import os
 import subprocess
 import shutil
+import tempfile
+import urllib.request
+import sys
 
 def main():
-    # 1. ultralytics 패키지 설치 확인 및 설치
-    try:
-        import ultralytics
-    except ImportError:
-        print("[*] 'ultralytics' 패키지가 없습니다. 설치를 진행합니다...")
-        subprocess.check_call(["pip", "install", "ultralytics"])
-        
-    from ultralytics import YOLO
-    
-    # 루트 디렉토리 및 모델이 저장될 목표 디렉토리 절대경로 산출
     project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
     models_dir = os.path.join(project_root, "models", "yolov5m")
     os.makedirs(models_dir, exist_ok=True)
+    target_onnx = os.path.join(models_dir, "yolov5m.onnx")
+
+    print("[*] 오리지널 YOLOv5m (Legacy) 모델 다운로드 및 Export를 시작합니다...")
     
-    print(f"[*] 다운로드 및 ONNX Export를 시작합니다 (저장 폴더: {models_dir})...")
-    
-    # PyTorch 모델 가중치가 scripts 폴더 같은 엉뚱한 곳에 받아지지 않도록 작업 폴더 변경
-    original_cwd = os.getcwd()
-    os.chdir(models_dir)
-    
-    try:
-        # 2. 모델 로드 (자동으로 yolov5m.pt 가 models_dir 내부에 다운로드 됨)
-        # v8 패키지에서 v5 모델을 사용할 경우 확장자로 자동 식별합니다.
-        model = YOLO("yolov5m.pt") 
+    with tempfile.TemporaryDirectory() as temp_dir:
+        # 1. YOLOv5 공식(레거시) 레포지토리 클론 (폴더가 비어있어야 함)
+        print("[*] YOLOv5 레포지토리를 임시 폴더에 Clone 합니다...")
+        subprocess.check_call(["git", "clone", "https://github.com/ultralytics/yolov5", temp_dir])
+
+        # 2. 모델 가중치 분리(강제) 다운로드 (내부 다운로더 멈춤 방지 및 진행률 표시)
+        pt_url = "https://github.com/ultralytics/yolov5/releases/download/v7.0/yolov5m.pt"
+        pt_path = os.path.join(temp_dir, "yolov5m.pt")
+        print(f"[*] 모델 가중치 사전 다운로드 중: {pt_url}")
         
-        # 3. ONNX 포맷으로 추출 (export)
-        print("[*] 모델을 ONNX 규격으로 내보내는 중...")
-        exported_path = model.export(format="onnx", opset=12, imgsz=[640,640], simplify=True)
-        print(f"[+] Export 결과물: {exported_path}")
+        try:
+            req = urllib.request.Request(pt_url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'})
+            with urllib.request.urlopen(req) as response, open(pt_path, 'wb') as out_file:
+                total_length = response.getheader('content-length')
+                if total_length is None:
+                    shutil.copyfileobj(response, out_file)
+                else:
+                    total_length = int(total_length)
+                    fetched = 0
+                    while True:
+                        chunk = response.read(8192)
+                        if not chunk:
+                            break
+                        out_file.write(chunk)
+                        fetched += len(chunk)
+                        percent = int(fetched * 100 / total_length)
+                        print(f"\rDownloading... {percent}% ({fetched/(1024*1024):.1f}MB / {total_length/(1024*1024):.1f}MB)", end="")
+                        sys.stdout.flush()
+            print("\n[+] 가중치 다운로드 완료!")
+        except Exception as e:
+            print(f"\n[!] 가중치 다운로드 실패: {e}")
+            return
         
-        # Export 된 파일을 안전하게 찾아서 변경된 target_path 와 매치시킵니다.
-        target_path = os.path.join(models_dir, "yolov5m.onnx")
+        # 3. export.py 실행 (미리 다운 받은 yolov5m.pt로 ONNX 변환)
+        print("[*] export.py를 통해 Legacy YOLOv5m 포맷(25200, 85)으로 파싱합니다...")
+        export_script = os.path.join(temp_dir, "export.py")
+        subprocess.check_call([
+            "python", export_script, 
+            "--weights", "yolov5m.pt", 
+            "--include", "onnx", 
+            "--opset", "17",
+            "--dynamic"
+        ], cwd=temp_dir)
         
-        if os.path.abspath(exported_path) != os.path.abspath(target_path):
-            shutil.move(exported_path, target_path)
-            
-        print(f"[+] YOLOv5m ONNX 모델이 준비되었습니다: {target_path}")
-        
-    except Exception as e:
-        print(f"[!] ONNX Export 중 에러가 발생했습니다: {e}")
-    finally:
-        os.chdir(original_cwd)
+        # 4. 결과물 복사
+        exported_onnx = os.path.join(temp_dir, "yolov5m.onnx")
+        if os.path.exists(exported_onnx):
+            shutil.copy(exported_onnx, target_onnx)
+            print(f"[+] 오리지널 YOLOv5m ONNX 모델이 준비되었습니다: {target_onnx}")
+        else:
+            print("[!] Export 실패: 변환된 onnx 파일을 찾을 수 없습니다.")
 
 if __name__ == "__main__":
     main()
