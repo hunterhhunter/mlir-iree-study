@@ -11,6 +11,12 @@ def main():
     os.makedirs(models_dir, exist_ok=True)
     target_onnx = os.path.join(models_dir, "yolov5m.onnx")
 
+    # [수정된 부분] ONNX 파일이 이미 존재하면 아예 모든 과정을 건너뛰고 바로 종료
+    if os.path.exists(target_onnx):
+        print(f"[*] 이미 변환된 YOLOv5m ONNX 모델이 존재합니다: {target_onnx}")
+        print("[*] 추가 파싱 및 다운로드 과정을 생략하고 즉시 종료합니다.")
+        return
+
     print("[*] 오리지널 YOLOv5m (Legacy) 모델 다운로드 및 Export를 시작합니다...")
     
     with tempfile.TemporaryDirectory() as temp_dir:
