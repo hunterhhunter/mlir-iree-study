@@ -11,11 +11,13 @@ from .image_classification_loader import ImageClassificationLoader
 from .object_detection_loader import ObjectDetectionLoader
 from .llama_loader import LlamaLoader
 from .bert_classification_loader import BertClassificationLoader
+from .ettm_loader import ETTmLoader
 from .preprocess_strategies import (
     PreprocessStrategy,
     MLPerfResNet50Preprocess,
     DirectResizePreprocess,
     SQuADPreprocessStrategy,
+    TimeSeriesPreprocessStrategy,
 )
 
 def create_dataloader(model_spec: Model_Spec, **kwargs) -> DataLoader:
@@ -45,6 +47,8 @@ def create_dataloader(model_spec: Model_Spec, **kwargs) -> DataLoader:
         return LlamaLoader(model_spec, **kwargs)
     elif task == Task.NLP_CLASSIFICATION:
         return BertClassificationLoader(model_spec, **kwargs)
+    elif task == Task.TIME_SERIES_FORECASTING:
+        return ETTmLoader(model_spec, **kwargs)
     else:
         raise ValueError(f"현재 '{task.name}' Task를 지원하는 DataLoader가 구현되어 있지 않습니다.")
 
@@ -54,9 +58,11 @@ __all__ = [
     "ObjectDetectionLoader",
     "LlamaLoader",
     "BertClassificationLoader",
+    "ETTmLoader",
     "create_dataloader",
     "PreprocessStrategy",
     "MLPerfResNet50Preprocess",
     "DirectResizePreprocess",
     "SQuADPreprocessStrategy",
+    "TimeSeriesPreprocessStrategy",
 ]
