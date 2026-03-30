@@ -12,7 +12,14 @@
 python datasets/load_imagenet_1k.py
 ```
 
-### 2. ETTh1 / ETTm1 (Time Series Forecasting)
+### 2. SQuAD 2.0 (NLP)
+질의응답(Question Answering) 모델 평가에 사용되는 SQuAD 2.0 데이터셋의 검증 세트(`dev-v2.0.json`)를 자동으로 다운로드합니다.
+- **실행**:
+```bash
+uv run datasets/download_squad2.py
+```
+
+### 3. ETTh1 / ETTm1 (Time Series Forecasting)
 PatchTST 등 시계열 예측 모델 평가를 위해서는 논문에서 사용하는 ETDataset이 필요합니다.
 직접 wget 명령어를 이용해 csv 원본 파일을 확보합니다.
 
