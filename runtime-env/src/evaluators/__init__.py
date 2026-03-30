@@ -11,6 +11,7 @@ from .image_classification_evaluator import ImageClassificationEvaluator
 from .llama_evaluator import LlamaEvaluator
 from .object_detection_evaluator import ObjectDetectionEvaluator
 from .bert_classification_evaluator import BertClassificationEvaluator
+from .time_series_forecasting_evaluator import TimeSeriesForecastingEvaluator
 
 def create_evaluator(model_spec: Model_Spec, **kwargs) -> Evaluator:
     """
@@ -42,6 +43,9 @@ def create_evaluator(model_spec: Model_Spec, **kwargs) -> Evaluator:
     elif task == Task.NLP_CLASSIFICATION:
         return BertClassificationEvaluator(**kwargs)
 
+    elif task == Task.TIME_SERIES_FORECASTING:
+        return TimeSeriesForecastingEvaluator(**kwargs)
+
     else:
         raise ValueError(f"현재 '{task.name}' Task를 지원하는 Evaluator가 구현되어 있지 않습니다.")
 
@@ -51,5 +55,6 @@ __all__ = [
     "LlamaEvaluator",
     "ObjectDetectionEvaluator",
     "BertClassificationEvaluator",
+    "TimeSeriesForecastingEvaluator",
     "create_evaluator"
 ]

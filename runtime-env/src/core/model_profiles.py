@@ -36,6 +36,21 @@ SUPPORTED_PROFILES: Dict[str, Dict[str, Any]] = {
         "input_shapes": {"input_ids": (1, 128), "attention_mask": (1, 128)},
         "input_dtype": {"input_ids": "int64", "attention_mask": "int64"},
         "output_shapes": {"logits": (1, 128, 32000)}
+    },
+    "patchtst-fm-r1": {
+        "task": Task.TIME_SERIES_FORECASTING,
+        # 다중 입력: past_values(정규화된 시계열) + past_observed_mask(관측 마스크)
+        # context_length=512, prediction_length=96, num_channels=7 (ETTm1 기본값)
+        "input_shapes": {
+            "past_values":        (1, 512, 7),
+            "past_observed_mask": (1, 512, 7),
+        },
+        "input_dtype": {
+            "past_values":        "float32",
+            "past_observed_mask": "bool",
+        },
+        # 실제 ONNX 출력 키는 모델 로드 후 자동 탐지
+        "output_shapes": {"__auto__": (1, 96, 7)},
     }
 }
 

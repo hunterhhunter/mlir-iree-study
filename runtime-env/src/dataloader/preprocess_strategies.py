@@ -11,6 +11,7 @@ Ref: https://github.com/mlcommons/inference/tree/master/vision/classification_an
 from abc import ABC, abstractmethod
 import numpy as np
 from PIL import Image
+from typing import Dict, Tuple
 
 
 class PreprocessStrategy(ABC):
@@ -205,4 +206,41 @@ class SQuADPreprocessStrategy(PreprocessStrategy):
         return {
             "input_ids":      encoded["input_ids"].astype(np.int64),
             "attention_mask": encoded["attention_mask"].astype(np.int64),
+        }
+
+
+class TimeSeriesPreprocessStrategy:
+    """
+    (T, C) numpy 배열 → RevIN 정규화 후 past_values / past_observed_mask 반환.
+
+    이미지 파이프라인과 인터페이스가 달라 PreprocessStrategy를 상속하지 않습니다.
+    ETTmLoader가 직접 호출합니다.
+    """
+
+    def __call__(
+        self,
+        window: np.ndarray,
+    ) -> Dict[str, np.ndarray]:
+        """
+        Args:
+            window: (context_length, C) float32 — 정규화 전 원본 윈도우
+
+        Returns:
+            dict:
+                'past_values'        : (T, C) float32, RevIN 정규화 후
+                'past_observed_mask' : (T, C) bool, 전부 True (ETTm 결측 없음)
+                'norm_stats'         : {'mean': (C,), 'std': (C,)}
+        """
+        mean = window.mean(axis=0)              # (C,)
+        std  = window.std(axis=0) + 1e-8        # (C,) 분모 0 방지
+
+        past_norm = ((window - mean) / std).astype(np.float32)  # (T, C)
+
+        return {
+            "past_values":        past_norm,                          # (T, C)
+            "past_observed_mask": np.ones_like(past_norm, dtype=bool),# (T, C)
+            "norm_stats": {
+                "mean": mean.astype(np.float32),
+                "std":  std.astype(np.float32),
+            },
         }
