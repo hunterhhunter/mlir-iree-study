@@ -35,6 +35,8 @@ class ObjectDetectionLoader(DataLoader):
             ])
             
         self.total_samples = len(self.image_files)
+        if self.total_samples == 0:
+            raise FileNotFoundError(f"[ObjectDetectionLoader] '{self.image_dir}' 경로에 이미지가 존재하지 않습니다. 데이터셋 경로를 점검하거나 다운로드를 다시 진행해 주세요.")
         self.current_idx = 0
         
         # 3. 모델 정보 기반 속성 파싱

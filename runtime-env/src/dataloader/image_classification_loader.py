@@ -61,6 +61,8 @@ class ImageClassificationLoader(DataLoader):
                             self.labels_map[parts[0]] = int(parts[1])
 
         self.total_samples = len(self.image_files)
+        if self.total_samples == 0:
+            raise FileNotFoundError(f"[ImageClassificationLoader] '{self.image_dir}' 경로에 이미지가 존재하지 않습니다. 데이터셋 경로를 점검하거나 다운로드를 확인해 주세요.")
         self.current_idx   = 0
 
         # 3. 입력 형상(H, W) 파싱
