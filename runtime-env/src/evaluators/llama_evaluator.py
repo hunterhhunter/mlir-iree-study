@@ -15,6 +15,11 @@ class LlamaEvaluator(Evaluator):
     """
     LLaMA 3.1 8B 모델의 SQuAD 2.0 QA 태스크 추론 결과를 평가하는 모듈.
 
+    스트리밍 평가를 지원합니다.
+    add_batch()에서 (seq_len, vocab_size) logits를 greedy decoding하여 텍스트로 변환한 뒤
+    EM·F1 점수만 누산하고, 원본 logits 텐서는 즉시 폐기합니다.
+    배치당 저장량: float 2개(em, f1) × 배치크기 — logits 대비 수천 배 절약.
+
     평가 지표:
         - Exact Match (EM): 예측 텍스트가 정답과 완전히 일치하는 비율
         - F1 Score: 토큰 수준 overlap 기반 점수
@@ -23,89 +28,141 @@ class LlamaEvaluator(Evaluator):
     """
 
     def __init__(self, **eval_options):
-        """
-        Args:
-            tokenizer_path (str): AutoTokenizer 로드 경로 (HuggingFace 모델 ID 또는 로컬 경로)
-        """
         tokenizer_path = eval_options.get("tokenizer_path", "meta-llama/Llama-3.1-8B-Instruct")
         self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_path)
+        self._reset()
+
+    # ------------------------------------------------------------------
+    # 내부 상태 초기화
+    # ------------------------------------------------------------------
+
+    def _reset(self):
+        """누산 상태를 초기화합니다."""
+        self._em_scores: List[float] = []
+        self._f1_scores: List[float] = []
+        self._timing_records: List[float] = []
+
+    # ------------------------------------------------------------------
+    # 스트리밍 인터페이스
+    # ------------------------------------------------------------------
+
+    def add_batch(self, outputs: Dict[str, np.ndarray], labels: Any, timing_ms: float) -> None:
+        """
+        배치의 logits를 greedy decoding하여 EM·F1 점수만 누산하고 원본 텐서는 즉시 폐기합니다.
+        배치당 추가 메모리: float 2개 × 배치크기 — O(배치크기), logits 대비 수천 배 절약.
+        """
+        logits_key = list(outputs.keys())[0]
+        logits = outputs[logits_key]  # (B, seq_len, vocab_size)
+
+        flat_labels = self._flatten_labels(labels)
+
+        for i in range(logits.shape[0]):
+            label = flat_labels[i]
+            prompt_length = label.get("prompt_length", None)
+            pred_text = self._decode_logits(logits[i], prompt_length)
+            gold_answers = self._extract_gold_answers(label)
+            self._em_scores.append(self._compute_exact_match(pred_text, gold_answers))
+            self._f1_scores.append(self._compute_f1(pred_text, gold_answers))
+
+        self._timing_records.append(timing_ms)
+        # logits 변수가 스코프를 벗어나면 GC 대상이 됩니다.
+
+    def compute(self) -> Dict[str, Any]:
+        """누산된 EM·F1 점수로 최종 메트릭을 계산합니다."""
+        num_samples = len(self._em_scores)
+        if num_samples == 0:
+            return {"Exact Match": 0.0, "F1 Score": 0.0, "num_samples": 0}
+
+        metrics = {
+            "Exact Match": float(np.mean(self._em_scores)) * 100,
+            "F1 Score": float(np.mean(self._f1_scores)) * 100,
+            "num_samples": num_samples,
+        }
+        metrics.update(self._compute_latency_metrics(self._timing_records))
+        return metrics
+
+    # ------------------------------------------------------------------
+    # 배치 호환 인터페이스 (단위 테스트 및 레거시 지원)
+    # ------------------------------------------------------------------
 
     def evaluate(self, result: InferenceResult) -> Dict[str, Any]:
-        """
-        InferenceResult를 받아 EM, F1, Latency 지표를 계산하여 반환함.
+        """InferenceResult 전체를 받아 스트리밍 내부 로직으로 채점합니다."""
+        self._reset()
 
-        Args:
-            result: InferenceResult
-                - outputs: {"logits": np.ndarray (batch, seq_len, vocab_size)}
-                - labels: List[Dict]  각 원소 = {"answers": [...], "is_impossible": bool, ...}
-                - timing_records: List[float] (ms)
-
-        Returns:
-            Dict[str, Any]: 지표 딕셔너리
-        """
         logits_key = list(result.outputs.keys())[0]
-        logits = result.outputs[logits_key]  # (batch, seq_len, vocab_size)
+        logits = result.outputs[logits_key]  # (N, seq_len, vocab_size)
 
-        labels = result.labels  # List[Dict] or single Dict
-        if isinstance(labels, dict):
-            labels = [labels]
+        flat_labels = self._flatten_labels(result.labels)
 
         num_samples = logits.shape[0]
         if num_samples == 0:
             return {"Exact Match": 0.0, "F1 Score": 0.0, "num_samples": 0}
 
-        if len(labels) != num_samples:
+        if len(flat_labels) != num_samples:
             raise ValueError(
-                f"logits 배치 크기({num_samples})와 labels 길이({len(labels)})가 일치하지 않습니다."
+                f"logits 배치 크기({num_samples})와 labels 길이({len(flat_labels)})가 일치하지 않습니다."
             )
 
-        em_scores, f1_scores = [], []
-
         for i in range(num_samples):
-            pred_text = self._decode_logits(logits[i])  # (seq_len, vocab_size)
-            label = labels[i]
-
+            label = flat_labels[i]
+            prompt_length = label.get("prompt_length", None)
+            pred_text = self._decode_logits(logits[i], prompt_length)
             gold_answers = self._extract_gold_answers(label)
-            em_scores.append(self._compute_exact_match(pred_text, gold_answers))
-            f1_scores.append(self._compute_f1(pred_text, gold_answers))
+            self._em_scores.append(self._compute_exact_match(pred_text, gold_answers))
+            self._f1_scores.append(self._compute_f1(pred_text, gold_answers))
 
-        metrics = {
-            "Exact Match": float(np.mean(em_scores)) * 100,
-            "F1 Score": float(np.mean(f1_scores)) * 100,
-            "num_samples": num_samples,
-        }
-        metrics.update(self._compute_latency_metrics(result.timing_records))
-        return metrics
+        self._timing_records = list(result.timing_records)
+        return self.compute()
 
-    # ------------------------------------------------------------------ #
-    #  Private helpers                                                     #
-    # ------------------------------------------------------------------ #
+    # ------------------------------------------------------------------
+    # 내부 헬퍼
+    # ------------------------------------------------------------------
 
-    def _decode_logits(self, logits_2d: np.ndarray) -> str:
+    def _flatten_labels(self, labels: Any) -> List[Dict]:
+        """레이블을 1D 딕셔너리 리스트로 평탄화합니다. 중첩 배치 형식을 지원합니다."""
+        if isinstance(labels, dict):
+            return [labels]
+        if isinstance(labels, list):
+            # 중첩 배치: [[label_dict, ...], [...]] → [label_dict, ...]
+            if labels and isinstance(labels[0], list):
+                return [lbl for batch in labels for lbl in batch]
+            return labels
+        return [labels]
+
+    def _decode_logits(self, logits_2d: np.ndarray, prompt_length: int = None) -> str:
         """
         (seq_len, vocab_size) logits → greedy decoding → 정규화 전 텍스트 반환.
-        특수 토큰은 제거하고 반환함.
+
+        causal LM에서 logits[t]는 위치 t+1의 토큰을 예측합니다.
+        따라서 모델이 생성한 답변은 logits[prompt_length-1:] 에 위치합니다.
+        prompt_length가 없으면 전체 시퀀스를 디코딩합니다(레거시/테스트 호환).
         """
-        token_ids = np.argmax(logits_2d, axis=-1).tolist()
+        if prompt_length is not None and prompt_length > 0:
+            # 답변 생성 구간: logits[prompt_length-1] 이 첫 번째 답변 토큰을 예측
+            answer_logits = logits_2d[prompt_length - 1:]
+        else:
+            answer_logits = logits_2d
+
+        token_ids = np.argmax(answer_logits, axis=-1).tolist()
+
+        # EOS 토큰에서 조기 종료
+        eos_id = self.tokenizer.eos_token_id
+        if eos_id is not None and eos_id in token_ids:
+            token_ids = token_ids[:token_ids.index(eos_id)]
+
         text = self.tokenizer.decode(token_ids, skip_special_tokens=True)
-        return text
+        return text.strip()
 
     def _normalize_answer(self, s: str) -> str:
         """SQuAD 공식 normalizer: 소문자 변환, 관사·구두점·여분 공백 제거."""
         s = s.lower()
-        # 구두점 제거
         s = s.translate(str.maketrans("", "", string.punctuation))
-        # 관사 제거 (a, an, the)
         s = re.sub(r"\b(a|an|the)\b", " ", s)
-        # 여분 공백 정리
         s = " ".join(s.split())
         return s
 
     def _extract_gold_answers(self, label: Dict) -> List[str]:
-        """
-        LlamaLoader 라벨에서 정답 텍스트 목록을 추출함.
-        is_impossible=True인 경우 빈 문자열을 정답으로 취급함.
-        """
+        """라벨에서 정답 텍스트 목록을 추출합니다. is_impossible=True이면 빈 문자열을 반환합니다."""
         if label.get("is_impossible", False):
             return [""]
         answers = label.get("answers", [])
@@ -118,11 +175,11 @@ class LlamaEvaluator(Evaluator):
         return float(any(norm_pred == self._normalize_answer(g) for g in gold_list))
 
     def _compute_f1(self, pred: str, gold_list: List[str]) -> float:
-        """gold_list 중 가장 높은 토큰 수준 F1 점수를 반환함."""
+        """gold_list 중 가장 높은 토큰 수준 F1 점수를 반환합니다."""
         return max(self._token_f1(pred, g) for g in gold_list)
 
     def _token_f1(self, pred: str, gold: str) -> float:
-        """두 문자열 사이의 토큰 수준 F1 점수를 계산함."""
+        """두 문자열 사이의 토큰 수준 F1 점수를 계산합니다."""
         pred_tokens = self._normalize_answer(pred).split()
         gold_tokens = self._normalize_answer(gold).split()
 
@@ -137,17 +194,13 @@ class LlamaEvaluator(Evaluator):
         return 2 * precision * recall / (precision + recall)
 
     def _compute_latency_metrics(self, timing_records: List[float]) -> Dict[str, float]:
-        """평균 및 P99 latency를 계산함."""
+        """평균 및 P99 latency를 계산합니다."""
         if not timing_records:
             return {}
         return {
             "Average Latency (ms)": float(np.mean(timing_records)),
             "P99 Latency (ms)": float(np.percentile(timing_records, 99)),
         }
-
-    # ------------------------------------------------------------------ #
-    #  Abstract method implementations                                     #
-    # ------------------------------------------------------------------ #
 
     def is_applicable(self, device_spec: Dict[str, Any], model_spec: Model_Spec) -> bool:
         return model_spec.task == Task.NLP_GENERATION

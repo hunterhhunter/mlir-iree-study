@@ -8,7 +8,7 @@ SQuAD 2.0 데이터셋을 사용하여 Llama 3.1 8B ONNX 모델의
     1. HuggingFace 로그인: huggingface-cli login
     2. 모델 다운로드:
        python models/download_model_from_huggingface.py \
-           --name onnx-community/Llama-3.1-8B-Instruct-ONNX \
+           --name onnx-community/Llama-3.2-3B-Instruct-ONNX \
            --format onnx --output models
 
 실행:
@@ -43,9 +43,9 @@ MODEL_DIR_B = os.path.join(
     project_root, "models", "meta-llama_Llama-3.1-8B-ONNX-int8"
 )
 
-# 방법 C: 방법 B 결과를 quantize_onnx_int8.py 로 INT8 양자화한 경우
+# 방법 C: Llama-3.2-3B-ONNX
 MODEL_DIR_C = os.path.join(
-    project_root, "models", "meta-llama_Llama-3.1-8B-ONNX-int8"
+    project_root, "models", "meta-llama_Llama-3.2-3B-ONNX"
 )
 
 DATASET_PATH = os.path.join(project_root, "datasets", "SQuAD_2")
@@ -54,6 +54,7 @@ CACHE_DIR = os.path.join(DATASET_PATH, ".cache_npz")
 # 추론 설정
 WARMUP_RUNS = 1
 BATCH_SIZE = 1
+MAX_SAMPLES = 500  # 0으로 설정하면 전체 데이터셋 (11873개) 처리
 
 
 # ------------------------------------------------------------------
@@ -134,8 +135,14 @@ def main():
     meta = loader.get_metadata()
     print(f"[*] 전체 샘플 수      : {meta['total_samples']}")
     print(f"[*] 답변 가능 샘플    : {meta['answerable_samples']}")
-    print(f"[*] 답변 불가 샘플    : {meta['impossible_samples']}")
+    print(f"[*] 유효 답변 샘플    : {meta['answerable_samples']}")
     print(f"[*] 최대 시퀀스 길이  : {meta['max_length']}")
+
+    # 측정 데이터 개수 제한 로직
+    if MAX_SAMPLES > 0:
+        loader.samples = loader.samples[:MAX_SAMPLES]
+        loader.total_samples = len(loader.samples)
+        print(f"\n[!] 빠른 측정을 위해 {MAX_SAMPLES}개의 샘플로 추론을 제한합니다.")
 
     # 5. OnnxRuntime 초기화
     print(f"\n[*] OnnxRuntime (CUDA) 초기화 중...")
