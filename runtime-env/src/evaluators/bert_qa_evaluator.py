@@ -24,10 +24,11 @@ class BertQAEvaluator(Evaluator):
 
         # 3. 채점 엔진 구동
         metrics = self._calculate_qa_metrics(pred_starts, pred_ends, true_starts, true_ends)
-        metrics["total_samples"] = len(true_starts)
+        total_samples = len(true_starts)
+        metrics["total_samples"] = total_samples
         
         # 4. Latency 지표 통합
-        metrics.update(self._calculate_latency_metrics(result.timing_records))
+        metrics.update(self._calculate_latency_metrics(result.timing_records, total_samples))
 
         return metrics
 
@@ -77,19 +78,26 @@ class BertQAEvaluator(Evaluator):
 
         return {"exact_match": exact_match, "f1": f1_score}
 
-    def _calculate_latency_metrics(self, timing_records: List[float]) -> Dict[str, float]:
-        """지연 시간 및 처리율(Throughtput)을 분할 계산하는 헬퍼 모듈"""
-        if not timing_records:
+    def _calculate_latency_metrics(self, timing_records: List[float], total_samples: int) -> Dict[str, float]:
+        """지연 시간 및 전체 쿼리 처리율(QPS)을 계측하는 헬퍼 모듈"""
+        if not timing_records or total_samples == 0:
             return {}
             
         avg_lat = float(np.mean(timing_records))
         p99_lat = float(np.percentile(timing_records, 99))
+        
+        # 기존 체계의 지표 (실제로는 배치 처리 횟수에 가깝지만 명칭 유지)
         samples_per_sec = (1000.0 / avg_lat) if avg_lat > 0 else 0.0
+        
+        # 전체 소요 시간(초) 대비 처리한 전체 샘플 수 기반의 엄밀한 QPS(Queries Per Second) 계산
+        total_time_sec = sum(timing_records) / 1000.0
+        qps = total_samples / total_time_sec if total_time_sec > 0 else 0.0
         
         return {
             "Average Latency (ms)": avg_lat,
             "P99 Latency (ms)": p99_lat,
-            "Samples/s": samples_per_sec
+            "Samples/s": samples_per_sec,
+            "QPS": qps
         }
 
     def is_applicable(self, device_spec: Dict[str, Any], model_spec: Model_Spec) -> bool:
@@ -97,4 +105,4 @@ class BertQAEvaluator(Evaluator):
         return "QUESTION_ANSWERING" in task_name
 
     def get_metric_names(self) -> List[str]:
-        return ["exact_match", "f1", "total_samples", "Average Latency (ms)", "P99 Latency (ms)", "Samples/s"]
+        return ["exact_match", "f1", "total_samples", "Average Latency (ms)", "P99 Latency (ms)", "Samples/s", "QPS"]
