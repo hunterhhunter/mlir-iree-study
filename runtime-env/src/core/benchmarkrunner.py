@@ -71,13 +71,14 @@ class BenchmarkRunner:
             timing_records=timing_records,
             labels=all_labels_list
         )
-    def run(self, warmup_runs: int = 1, batch_size: int = 1) -> Dict[str, Any]:
+    def run(self, warmup_runs: int = 1, batch_size: int = 1, max_steps: int = None) -> Dict[str, Any]:
         """
         주입된 컴포넌트들을 연결하여 벤치마크 테스트 전체 루프를 수행합니다.
         
         Args:
             warmup_runs (int): 본 측정 전 Runtime 엔진을 예열하기 위한 횟수
             batch_size (int): 한 번에 묶어서 추론을 보낼 갯수
+            max_steps (int): 옵션 - 지정된 횟수만큼만 루프를 돌고 탈출(테스트/리미터용)
             
         Returns:
             Dict[str, Any]: 최종 성능 종합 메트릭 리포트 (Evaluator 반환값)
@@ -110,6 +111,11 @@ class BenchmarkRunner:
         print("[BenchmarkRunner] ⚡ Running inference loop...")
         batch_idx = 1
         while True:
+            # 강제 종료 리미터 발동
+            if max_steps is not None and batch_idx > max_steps:
+                print(f"[BenchmarkRunner] 🛑 사용자가 요청한 리미터에 도달했습니다! ({max_steps} steps) - 즉각 탈출하여 결과를 채점합니다.")
+                break
+                
             # 지정된 크기만큼 데이터 확보 (메모리 OOM 방지)
             batch = self.dataloader.load_batch(batch_size)
             if not batch:

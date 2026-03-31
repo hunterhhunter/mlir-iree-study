@@ -27,32 +27,33 @@ def main():
     parser.add_argument("--dataset", type=str, required=True, help="평가용 데이터셋 최상위 디렉토리 (예: datasets/imagenet_1k 또는 datasets/coco128)")
     parser.add_argument("--image-dir", type=str, default="", help="(옵션) 데이터셋 내 이미지 하위 폴더 경로")
     parser.add_argument("--label-dir", type=str, default="", help="(옵션) 데이터셋 내 라벨 하위 폴더 경로")
-    parser.add_argument("--task", type=str, default="classification", choices=["classification", "detection", "nlp_classification", "nlp_generation"], help="평가할 태스크 유형 (기본: classification)")
     parser.add_argument("--layout", type=str, default="NCHW", choices=["NCHW", "NHWC"], help="모델 텐서 레이아웃 (기본: NCHW)")
     parser.add_argument("--backend", type=str, default="onnxruntime", choices=["onnxruntime", "iree"], help="추론을 실행할 백엔드 (기본: onnxruntime)")
     parser.add_argument("--device", type=str, default="cpu", help="추론 장치 (예: cpu, cuda, 기본: cpu)")
     parser.add_argument("--batch-size", "-b", type=int, default=1, help="추론 배치 사이즈 (기본: 1)")
     parser.add_argument("--warmup", "-w", type=int, default=2, help="웜업 횟수 (기본: 2)")
+    parser.add_argument("--max-steps", type=int, default=None, help="시간이 지루할 때 쓸 강제 종료 리미트 (옵션)")
     
     args = parser.parse_args()
-    
-    print("\n" + "="*60)
-    print(f" BenchmarkRunner CLI - Project: Antigravity ")
-    print(f"   Model: {args.model} | Task: {args.task.upper()} | Layout: {args.layout}")
-    print(f"   Backend: {args.backend} | Device: {args.device}")
-    print("="*60)
     
     if not os.path.exists(args.onnx):
         print(f"[Error] 모델 파일을 찾을 수 없습니다: {args.onnx}")
         sys.exit(1)
         
-    TASK_MAP = {
-        "classification": Task.IMAGE_CLASSIFICATION,
-        "detection": Task.OBJECT_DETECTION,
-        "nlp_classification": Task.NLP_CLASSIFICATION,
-        "nlp_generation": Task.NLP_GENERATION
-    }
-    task_enum = TASK_MAP.get(args.task, Task.IMAGE_CLASSIFICATION)
+    # [설계 개선] CLI 인자(--task)에 의존하지 않고, 레지스트리(SUPPORTED_PROFILES)에서 태스크를 자동 추론 (DRY 원칙)
+    from src.core.model_profiles import SUPPORTED_PROFILES
+    profile = SUPPORTED_PROFILES.get(args.model)
+    if not profile:
+        print(f"[Error] '{args.model}' 프로필을 찾을 수 없습니다. model_profiles.py에 등록되었는지 확인하세요.")
+        sys.exit(1)
+    
+    task_enum = profile["task"]
+    
+    print("\n" + "="*60)
+    print(f" BenchmarkRunner CLI - Project: Antigravity ")
+    print(f"   Model: {args.model} | Task: {task_enum.name} | Layout: {args.layout}")
+    print(f"   Backend: {args.backend} | Device: {args.device}")
+    print("="*60)
     
     # 0. DataLoader 공통 인터페이스 규약 및 CoC 해소 (Resolver)
     from src.utils.dataset_resolver import resolve_dataset_paths
@@ -74,7 +75,7 @@ def main():
     compiled_model = CompiledModel(spec=spec, backend_name=args.backend, artifact_path=Path(args.onnx))
     
     # 2. 컴포넌트(주입 객체) 조립
-    print(f"[Factory] Assembling components for {args.task}...")
+    print(f"[Factory] Assembling components for {task_enum.name}...")
     loader = create_dataloader(
         model_spec=spec,
         dataset_path=args.dataset,
@@ -96,7 +97,7 @@ def main():
     
     # 3. 오케스트레이터 구동
     runner = BenchmarkRunner(dataloader=loader, runtime=runtime, evaluator=evaluator)
-    results = runner.run(warmup_runs=args.warmup, batch_size=args.batch_size)
+    results = runner.run(warmup_runs=args.warmup, batch_size=args.batch_size, max_steps=args.max_steps)
     
     # 4. 최종 결과 리포팅
     print("\n" + "="*40)

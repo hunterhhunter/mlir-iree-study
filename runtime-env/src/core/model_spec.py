@@ -12,6 +12,7 @@ class Task(Enum):
     SEMANTIC_SEGMENTATION = auto()
     NLP_CLASSIFICATION = auto()
     NLP_GENERATION = auto()
+    QUESTION_ANSWERING = auto()
     SPEECH_RECOGNITION = auto()
     MATMUL = auto()
     CONV2D = auto()
