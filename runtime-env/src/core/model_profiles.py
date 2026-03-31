@@ -37,6 +37,12 @@ SUPPORTED_PROFILES: Dict[str, Dict[str, Any]] = {
         "input_dtype": {"input_ids": "int64", "attention_mask": "int64"},
         "output_shapes": {"logits": (1, 128, 32000)}
     },
+    "bert-base-uncased-squad-v1": {
+        "task": Task.QUESTION_ANSWERING,
+        "input_shapes": {"input_ids": (1, 384), "attention_mask": (1, 384)},
+        "input_dtype": {"input_ids": "int64", "attention_mask": "int64"},
+        "output_shapes": {"start_logits": (1, 384), "end_logits": (1, 384)}
+    },
     "patchtst-fm-r1": {
         "task": Task.TIME_SERIES_FORECASTING,
         # 다중 입력: past_values(정규화된 시계열) + past_observed_mask(관측 마스크)

@@ -11,6 +11,7 @@ from .image_classification_evaluator import ImageClassificationEvaluator
 from .llama_evaluator import LlamaEvaluator
 from .object_detection_evaluator import ObjectDetectionEvaluator
 from .bert_classification_evaluator import BertClassificationEvaluator
+from .bert_qa_evaluator import BertQAEvaluator
 from .time_series_forecasting_evaluator import TimeSeriesForecastingEvaluator
 
 def create_evaluator(model_spec: Model_Spec, **kwargs) -> Evaluator:
@@ -43,6 +44,9 @@ def create_evaluator(model_spec: Model_Spec, **kwargs) -> Evaluator:
     elif task == Task.NLP_CLASSIFICATION:
         return BertClassificationEvaluator(**kwargs)
 
+    elif task == Task.QUESTION_ANSWERING:
+        return BertQAEvaluator(**kwargs)
+
     elif task == Task.TIME_SERIES_FORECASTING:
         return TimeSeriesForecastingEvaluator(**kwargs)
 
@@ -55,6 +59,7 @@ __all__ = [
     "LlamaEvaluator",
     "ObjectDetectionEvaluator",
     "BertClassificationEvaluator",
+    "BertQAEvaluator",
     "TimeSeriesForecastingEvaluator",
     "create_evaluator"
 ]

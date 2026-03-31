@@ -11,6 +11,7 @@ from .image_classification_loader import ImageClassificationLoader
 from .object_detection_loader import ObjectDetectionLoader
 from .llama_loader import LlamaLoader
 from .bert_classification_loader import BertClassificationLoader
+from .bert_qa_loader import BertQALoader
 from .ettm_loader import ETTmLoader
 from .preprocess_strategies import (
     PreprocessStrategy,
@@ -47,6 +48,8 @@ def create_dataloader(model_spec: Model_Spec, **kwargs) -> DataLoader:
         return LlamaLoader(model_spec, **kwargs)
     elif task == Task.NLP_CLASSIFICATION:
         return BertClassificationLoader(model_spec, **kwargs)
+    elif task == Task.QUESTION_ANSWERING:
+        return BertQALoader(model_spec, **kwargs)
     elif task == Task.TIME_SERIES_FORECASTING:
         return ETTmLoader(model_spec, **kwargs)
     else:
@@ -58,6 +61,7 @@ __all__ = [
     "ObjectDetectionLoader",
     "LlamaLoader",
     "BertClassificationLoader",
+    "BertQALoader",
     "ETTmLoader",
     "create_dataloader",
     "PreprocessStrategy",
