@@ -102,13 +102,11 @@ class TestSQuADPreprocessStrategy:
             strategy = SQuADPreprocessStrategy.__new__(SQuADPreprocessStrategy)
             strategy.tokenizer = mock_tok.return_value
             strategy.max_length = 128
-            strategy.SYSTEM_PROMPT = SQuADPreprocessStrategy.SYSTEM_PROMPT
 
             prompt = strategy._build_prompt("Who is Alice?", "Alice is a person.")
             assert "Who is Alice?" in prompt
             assert "Alice is a person." in prompt
-            assert "<|begin_of_text|>" in prompt
-            assert "<|eot_id|>" in prompt
+            assert "Answer:" in prompt
 
     def test_call_raises_type_error(self):
         """이미지 파이프라인용 __call__ 호출 시 TypeError를 발생시켜야 합니다."""
@@ -137,7 +135,6 @@ class TestSQuADPreprocessStrategy:
             strategy = SQuADPreprocessStrategy.__new__(SQuADPreprocessStrategy)
             strategy.tokenizer = tokenizer
             strategy.max_length = max_length
-            strategy.SYSTEM_PROMPT = SQuADPreprocessStrategy.SYSTEM_PROMPT
 
             result = strategy.tokenize("What?", "Some context.")
             assert result["input_ids"].shape      == (1, max_length)
@@ -185,8 +182,8 @@ class TestLlamaLoader:
         assert "label"          in sample
         assert "qa_id"          in sample
 
-        assert sample["input"]["input_ids"].shape      == (1, 128)
-        assert sample["input"]["attention_mask"].shape == (1, 128)
+        assert sample["input"]["input_ids"].shape      == (128,)
+        assert sample["input"]["attention_mask"].shape == (128,)
         assert sample["input"]["input_ids"].dtype      == np.int64
         assert sample["input"]["attention_mask"].dtype == np.int64
 

@@ -22,23 +22,45 @@ from src.runtimes import create_runtime
 
 def main():
     parser = argparse.ArgumentParser(description="Unified BenchmarkRunner CLI Orchestrator")
-    parser.add_argument("--model", type=str, required=True, help="모델 이름 (예: resnet50, yolov5m)")
-    parser.add_argument("--onnx", type=str, required=True, help="ONNX 파일의 절대 또는 상대 경로")
-    parser.add_argument("--dataset", type=str, required=True, help="평가용 데이터셋 최상위 디렉토리 (예: datasets/imagenet_1k 또는 datasets/coco128)")
+    parser.add_argument("--model", type=str, required=True, help="모델 이름 (예: resnet50, llama-3.2-3b)")
+    parser.add_argument("--onnx", type=str, default=None, help="ONNX 파일의 절대 또는 상대 경로 (onnxruntime 백엔드 필수)")
+    parser.add_argument("--model-path", type=str, default=None, help="HuggingFace 모델 디렉토리 경로 (vLLM 백엔드 필수)")
+    parser.add_argument("--tokenizer-path", type=str, default=None, help="HuggingFace 토크나이저 디렉토리 경로 (NLP 모델 필수)")
+    parser.add_argument("--dataset", type=str, required=True, help="평가용 데이터셋 최상위 디렉토리 또는 CSV 파일 경로")
     parser.add_argument("--image-dir", type=str, default="", help="(옵션) 데이터셋 내 이미지 하위 폴더 경로")
     parser.add_argument("--label-dir", type=str, default="", help="(옵션) 데이터셋 내 라벨 하위 폴더 경로")
     parser.add_argument("--layout", type=str, default="NCHW", choices=["NCHW", "NHWC"], help="모델 텐서 레이아웃 (기본: NCHW)")
-    parser.add_argument("--backend", type=str, default="onnxruntime", choices=["onnxruntime", "iree"], help="추론을 실행할 백엔드 (기본: onnxruntime)")
+    parser.add_argument("--backend", type=str, default="onnxruntime", choices=["onnxruntime", "iree", "vllm"], help="추론을 실행할 백엔드 (기본: onnxruntime)")
     parser.add_argument("--device", type=str, default="cpu", help="추론 장치 (예: cpu, cuda, 기본: cpu)")
     parser.add_argument("--batch-size", "-b", type=int, default=1, help="추론 배치 사이즈 (기본: 1)")
     parser.add_argument("--warmup", "-w", type=int, default=2, help="웜업 횟수 (기본: 2)")
     parser.add_argument("--max-steps", type=int, default=None, help="시간이 지루할 때 쓸 강제 종료 리미트 (옵션)")
+    parser.add_argument("--max-new-tokens", type=int, default=256, help="LLM 생성 최대 토큰 수 (기본: 256)")
+    parser.add_argument("--debug", action="store_true", help="샘플별 예측/정답/점수 로그 출력 (기본: 비활성)")
     
     args = parser.parse_args()
     
-    if not os.path.exists(args.onnx):
-        print(f"[Error] 모델 파일을 찾을 수 없습니다: {args.onnx}")
-        sys.exit(1)
+    # 백엔드별 필수 인자 검증
+    if args.backend == "vllm":
+        if not args.model_path:
+            print("[Error] vllm 백엔드에는 --model-path가 필요합니다.")
+            sys.exit(1)
+    else:
+        if not args.onnx:
+            print("[Error] onnxruntime/iree 백엔드에는 --onnx가 필요합니다.")
+            sys.exit(1)
+        if not os.path.exists(args.onnx):
+            print(f"[Error] 모델 파일을 찾을 수 없습니다: {args.onnx}")
+            sys.exit(1)
+        # 디렉토리가 넘어온 경우 model.onnx 자동 탐색 (HuggingFace 다운로드 폴더 구조 대응)
+        if os.path.isdir(args.onnx):
+            candidate = os.path.join(args.onnx, "model.onnx")
+            if os.path.exists(candidate):
+                print(f"[Info] --onnx에 디렉토리가 지정되었습니다. {candidate} 를 사용합니다.")
+                args.onnx = candidate
+            else:
+                print(f"[Error] 디렉토리 {args.onnx} 에서 model.onnx를 찾을 수 없습니다.")
+                sys.exit(1)
         
     # [설계 개선] CLI 인자(--task)에 의존하지 않고, 레지스트리(SUPPORTED_PROFILES)에서 태스크를 자동 추론 (DRY 원칙)
     from src.core.model_profiles import SUPPORTED_PROFILES
@@ -50,7 +72,7 @@ def main():
     task_enum = profile["task"]
     
     print("\n" + "="*60)
-    print(f" BenchmarkRunner CLI - Project: Antigravity ")
+    print(f" BenchmarkRunner CLI ")
     print(f"   Model: {args.model} | Task: {task_enum.name} | Layout: {args.layout}")
     print(f"   Backend: {args.backend} | Device: {args.device}")
     print("="*60)
@@ -66,16 +88,23 @@ def main():
         loader_kwargs["label_path"] = label_path
     
     # 1. Spec & Artifact 생성
+    artifact_path = Path(args.model_path) if args.backend == "vllm" else Path(args.onnx)
     try:
-        spec = create_model_spec(args.model, args.onnx, task=task_enum)
+        spec = create_model_spec(args.model, str(artifact_path), task=task_enum)
     except Exception as e:
-        print(f"[Error] ONNX 스펙 파싱 실패: {e}")
+        print(f"[Error] 스펙 파싱 실패: {e}")
         sys.exit(1)
-        
-    compiled_model = CompiledModel(spec=spec, backend_name=args.backend, artifact_path=Path(args.onnx))
+
+    compiled_model = CompiledModel(spec=spec, backend_name=args.backend, artifact_path=artifact_path)
     
     # 2. 컴포넌트(주입 객체) 조립
     print(f"[Factory] Assembling components for {task_enum.name}...")
+    # NLP_GENERATION: tokenizer_path 전달, TIME_SERIES_FORECASTING: csv_path로 dataset 직접 전달
+    if task_enum == Task.NLP_GENERATION and args.tokenizer_path:
+        loader_kwargs["tokenizer_path"] = args.tokenizer_path
+    if task_enum == Task.TIME_SERIES_FORECASTING:
+        loader_kwargs["csv_path"] = args.dataset
+
     loader = create_dataloader(
         model_spec=spec,
         dataset_path=args.dataset,
@@ -93,10 +122,18 @@ def main():
     runtime.load(compiled_model)
     
     # 평가기 팩토리 로직
-    evaluator = create_evaluator(spec, top_k=(1, 5))
+    evaluator_kwargs = {}
+    if task_enum == Task.NLP_GENERATION and args.tokenizer_path:
+        evaluator_kwargs["tokenizer_path"] = args.tokenizer_path
+    if args.debug:
+        evaluator_kwargs["debug"] = True
+    evaluator = create_evaluator(spec, top_k=(1, 5), **evaluator_kwargs)
     
     # 3. 오케스트레이터 구동
-    runner = BenchmarkRunner(dataloader=loader, runtime=runtime, evaluator=evaluator)
+    runner = BenchmarkRunner(
+        dataloader=loader, runtime=runtime, evaluator=evaluator,
+        max_new_tokens=args.max_new_tokens
+    )
     results = runner.run(warmup_runs=args.warmup, batch_size=args.batch_size, max_steps=args.max_steps)
     
     # 4. 최종 결과 리포팅
