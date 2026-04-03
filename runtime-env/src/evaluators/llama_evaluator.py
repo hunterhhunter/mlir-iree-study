@@ -30,6 +30,8 @@ class LlamaEvaluator(Evaluator):
     def __init__(self, **eval_options):
         tokenizer_path = eval_options.get("tokenizer_path", "meta-llama/Llama-3.1-8B-Instruct")
         self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_path)
+        # debug=True 이면 샘플마다 예측/정답/점수를 출력합니다.
+        self.debug: bool = eval_options.get("debug", False)
         self._reset()
 
     # ------------------------------------------------------------------
@@ -40,7 +42,10 @@ class LlamaEvaluator(Evaluator):
         """누산 상태를 초기화합니다."""
         self._em_scores: List[float] = []
         self._f1_scores: List[float] = []
-        self._timing_records: List[float] = []
+        self._timing_records: List[float] = []  # total_ms
+        self._ttft_records: List[float] = []
+        self._tpot_records: List[float] = []
+        self._total_tokens: int = 0
 
     # ------------------------------------------------------------------
     # 스트리밍 인터페이스
@@ -48,24 +53,54 @@ class LlamaEvaluator(Evaluator):
 
     def add_batch(self, outputs: Dict[str, np.ndarray], labels: Any, timing_ms: float) -> None:
         """
-        배치의 logits를 greedy decoding하여 EM·F1 점수만 누산하고 원본 텐서는 즉시 폐기합니다.
-        배치당 추가 메모리: float 2개 × 배치크기 — O(배치크기), logits 대비 수천 배 절약.
-        """
-        logits_key = list(outputs.keys())[0]
-        logits = outputs[logits_key]  # (B, seq_len, vocab_size)
+        배치의 출력을 EM·F1 점수만 누산하고 원본 텐서는 즉시 폐기합니다.
 
+        두 가지 경로를 지원합니다:
+        - vLLM 경로: outputs에 "generated_ids" 키가 있으면 이미 생성된 토큰 ID를 직접 디코딩
+        - ONNX 경로: logits (B, seq_len, vocab_size)에서 greedy decoding
+        """
         flat_labels = self._flatten_labels(labels)
 
-        for i in range(logits.shape[0]):
-            label = flat_labels[i]
-            prompt_length = label.get("prompt_length", None)
-            pred_text = self._decode_logits(logits[i], prompt_length)
+        if "generated_ids" in outputs:
+            # vLLM 경로: 배치 크기 1 가정 (VllmRuntime.generate() 는 단일 샘플 반환)
+            generated_ids = outputs["generated_ids"]
+            self._total_tokens += len(generated_ids)
+            label = flat_labels[0]
+            raw_text = self.tokenizer.decode(
+                generated_ids.tolist(), skip_special_tokens=True
+            ).strip()
+            pred_text = self._postprocess_response(raw_text)
             gold_answers = self._extract_gold_answers(label)
-            self._em_scores.append(self._compute_exact_match(pred_text, gold_answers))
-            self._f1_scores.append(self._compute_f1(pred_text, gold_answers))
+            em = self._compute_exact_match(pred_text, gold_answers)
+            f1 = self._compute_f1(pred_text, gold_answers)
+            self._em_scores.append(em)
+            self._f1_scores.append(f1)
+            self._log_sample(len(self._em_scores), label, pred_text, gold_answers, em, f1)
+        else:
+            # ONNX logits 경로
+            logits_key = list(outputs.keys())[0]
+            logits = outputs[logits_key]  # (B, seq_len, vocab_size)
 
-        self._timing_records.append(timing_ms)
-        # logits 변수가 스코프를 벗어나면 GC 대상이 됩니다.
+            for i in range(logits.shape[0]):
+                label = flat_labels[i]
+                prompt_length = label.get("prompt_length", None)
+                raw_text = self._decode_logits(logits[i], prompt_length)
+                pred_text = self._postprocess_response(raw_text)
+                gold_answers = self._extract_gold_answers(label)
+                em = self._compute_exact_match(pred_text, gold_answers)
+                f1 = self._compute_f1(pred_text, gold_answers)
+                self._em_scores.append(em)
+                self._f1_scores.append(f1)
+                self._log_sample(len(self._em_scores), label, pred_text, gold_answers, em, f1)
+
+        # timing_ms: float(non-LLM) 또는 dict {"total_ms", "ttft_ms", "tpot_ms"}(LLM)
+        if isinstance(timing_ms, dict):
+            self._timing_records.append(timing_ms.get("total_ms", 0.0))
+            self._ttft_records.append(timing_ms.get("ttft_ms", 0.0))
+            self._tpot_records.append(timing_ms.get("tpot_ms", 0.0))
+        else:
+            self._timing_records.append(float(timing_ms))
+        # outputs 변수가 스코프를 벗어나면 GC 대상이 됩니다.
 
     def compute(self) -> Dict[str, Any]:
         """누산된 EM·F1 점수로 최종 메트릭을 계산합니다."""
@@ -79,6 +114,18 @@ class LlamaEvaluator(Evaluator):
             "num_samples": num_samples,
         }
         metrics.update(self._compute_latency_metrics(self._timing_records))
+        if self._ttft_records:
+            metrics["Avg TTFT (ms)"] = float(np.mean(self._ttft_records))
+            metrics["P99 TTFT (ms)"] = float(np.percentile(self._ttft_records, 99))
+        if self._tpot_records:
+            # KV 캐시 없는 ONNX 경로에서는 시퀀스가 길어질수록 decode step이 느려짐.
+            # 실제 서빙 환경(KV 캐시)의 TPOT와 다르므로 이름으로 구분합니다.
+            metrics["Avg Decode Step (no KV cache) (ms)"] = float(np.mean(self._tpot_records))
+            metrics["P99 Decode Step (no KV cache) (ms)"] = float(np.percentile(self._tpot_records, 99))
+        if self._total_tokens > 0 and self._timing_records:
+            total_time_s = sum(self._timing_records) / 1000.0
+            metrics["Throughput (tokens/s)"] = self._total_tokens / total_time_s
+            metrics["Total Tokens Generated"] = self._total_tokens
         return metrics
 
     # ------------------------------------------------------------------
@@ -197,6 +244,57 @@ class LlamaEvaluator(Evaluator):
         recall = num_common / len(gold_tokens)
         return 2 * precision * recall / (precision + recall)
 
+    # unanswerable로 간주할 문자열 집합
+    _NO_ANS_MARKERS = frozenset({
+        "unanswerable", "no answer", "cannot answer", "not answerable",
+        "null", "none", "n/a", "unknown", "",
+    })
+
+    def _postprocess_response(self, text: str) -> str:
+        """
+        모델 생성 텍스트 → SQuAD2 평가용 예측 텍스트 변환.
+
+        Stop token으로 1차 차단 후에도 남은 패턴을 정리합니다.
+        1. "Passage:" / "Question:" 등 컨텍스트 반복 패턴 제거
+        2. 첫 줄만 추출
+        3. unanswerable 마커 감지 → 빈 문자열 반환
+        4. 비정상 길이(너무 짧거나 너무 김) → 빈 문자열
+        """
+        # 1. 이스케이프된 개행 정규화
+        text = text.replace("\\n", "\n").strip()
+
+        # 2. "Passage:", "Question:", "Context:" 이후 내용 제거
+        text = re.sub(r"(?i)(passage|question|context)[:\s].*$", "", text, flags=re.DOTALL).strip()
+
+        # 3. 첫 줄만 추출
+        first_line = text.split("\n")[0].strip()
+
+        # 4. unanswerable 마커
+        if first_line.lower() in self._NO_ANS_MARKERS:
+            return ""
+
+        # 5. 비정상 길이 필터 (1자 미만 또는 100자 초과는 신뢰하기 어려움)
+        if len(first_line) < 1 or len(first_line) > 100:
+            return ""
+
+        return first_line
+
+    def _log_sample(self, idx: int, label: Dict, pred: str, golds: List[str],
+                    em: float, f1: float) -> None:
+        """debug=True 일 때 샘플별 예측/정답/점수를 출력합니다."""
+        if not self.debug:
+            return
+        qa_id = label.get("id", "?")
+        gold_str = " | ".join(golds) if golds else "(none)"
+        # 긴 텍스트는 잘라서 출력
+        pred_display = (pred[:120] + "…") if len(pred) > 120 else pred
+        print(
+            f"[LlamaEval #{idx}] id={qa_id}\n"
+            f"  PRED : {pred_display!r}\n"
+            f"  GOLD : {gold_str!r}\n"
+            f"  EM={em:.0f}  F1={f1:.3f}"
+        )
+
     def _compute_latency_metrics(self, timing_records: List[float]) -> Dict[str, float]:
         """평균 및 P99 latency를 계산합니다."""
         if not timing_records:
@@ -215,5 +313,11 @@ class LlamaEvaluator(Evaluator):
             "F1 Score",
             "Average Latency (ms)",
             "P99 Latency (ms)",
+            "Avg TTFT (ms)",
+            "P99 TTFT (ms)",
+            "Avg Decode Step (no KV cache) (ms)",
+            "P99 Decode Step (no KV cache) (ms)",
+            "Throughput (tokens/s)",
+            "Total Tokens Generated",
             "num_samples",
         ]
