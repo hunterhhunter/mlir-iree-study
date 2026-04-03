@@ -77,7 +77,7 @@ class ETTmLoader(DataLoader):
         self.split_boundaries  = kwargs.get("split_boundaries",       None)
         self.cache_dir         = kwargs.get("cache_dir", None)
 
-        target_cols = kwargs.get("target_cols", ["OT"])
+        target_cols = kwargs.get("target_cols", None)
         self.feature_cols: List[str] = _ETTM_FEATURE_COLS if target_cols is None else list(target_cols)
 
         stride = kwargs.get("stride", None)
