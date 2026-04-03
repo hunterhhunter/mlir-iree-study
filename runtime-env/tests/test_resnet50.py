@@ -131,7 +131,7 @@ def main():
         cache_dir=cache_dir,
     )
     
-    runtime = OnnxRuntime(device="cpu")
+    runtime = OnnxRuntime(device="cuda")
     runtime.load(compiled_model)
     
     evaluator = ImageClassificationEvaluator(top_k=(1, 5))

@@ -173,16 +173,22 @@ class LlamaLoader(DataLoader):
         self.current_idx += 1
 
         tensors = self._load_or_tokenize(sample)
+        attn = tensors["attention_mask"]
+        pos = np.maximum(np.cumsum(attn, axis=-1) - 1, 0).astype(np.int64)
         return {
             "input": {
-                "input_ids":      tensors["input_ids"],
-                "attention_mask": tensors["attention_mask"],
+                "input_ids":      tensors["input_ids"].reshape(-1),
+                "attention_mask": attn.reshape(-1),
+                "position_ids":   pos.reshape(-1),
             },
             "label": {
                 "id":                sample["qa_id"],
                 "answers":           sample["answers"],
                 "is_impossible":     sample["is_impossible"],
                 "plausible_answers": sample["plausible_answers"],
+                # 프롬프트 실제 토큰 수: Evaluator가 답변 생성 위치를 찾기 위해 필요.
+                # logits[prompt_length-1] 이 모델이 첫 답변 토큰을 예측하는 위치.
+                "prompt_length":     int(attn.sum()),
             },
             "qa_id": sample["qa_id"],
         }
@@ -207,16 +213,20 @@ class LlamaLoader(DataLoader):
             )
         sample = self.samples[index]
         tensors = self._load_or_tokenize(sample)
+        attn = tensors["attention_mask"]
+        pos = np.maximum(np.cumsum(attn, axis=-1) - 1, 0).astype(np.int64)
         return {
             "input": {
-                "input_ids":      tensors["input_ids"],
-                "attention_mask": tensors["attention_mask"],
+                "input_ids":      tensors["input_ids"].reshape(-1),
+                "attention_mask": attn.reshape(-1),
+                "position_ids":   pos.reshape(-1),
             },
             "label": {
                 "id":                sample["qa_id"],
                 "answers":           sample["answers"],
                 "is_impossible":     sample["is_impossible"],
                 "plausible_answers": sample["plausible_answers"],
+                "prompt_length":     int(attn.sum()),
             },
             "qa_id": sample["qa_id"],
         }

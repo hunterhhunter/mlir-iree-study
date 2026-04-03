@@ -1,8 +1,7 @@
 import time
 import numpy as np
-from typing import Dict, Any, List
+from typing import Dict, Any
 
-from .inference_result import InferenceResult
 from ..dataloader.base import DataLoader
 from ..runtimes.base import Runtime
 from ..evaluators.base import Evaluator
@@ -11,12 +10,17 @@ class BenchmarkRunner:
     """
     DataLoader(데이터 공급) -> Runtime(추론 실행) -> Evaluator(결과 평가)
     전체 파이프라인을 일관되게 관리하는 오케스트레이터 클래스입니다.
+
+    스트리밍 평가(Streaming Evaluation) 패턴을 채택합니다.
+    배치마다 Evaluator.add_batch()를 호출하여 무거운 출력 텐서를 즉시 처리·폐기하고,
+    루프 종료 후 Evaluator.compute()로 최종 메트릭을 산출합니다.
+    이로써 수백만 샘플을 처리해도 RAM 사용량이 선형으로 폭발하지 않습니다.
     """
     def __init__(self, dataloader: DataLoader, runtime: Runtime, evaluator: Evaluator):
         self.dataloader = dataloader
         self.runtime = runtime
         self.evaluator = evaluator
-        
+
         # DataLoader의 공식 메타데이터 계약(Contract)을 통해 Fast-Path 여부 확인
         metadata = self.dataloader.get_metadata()
         self.is_static_batched = metadata.get("is_static_batched", False)
@@ -53,38 +57,24 @@ class BenchmarkRunner:
             return collated_input
         return {fallback_name: collated_input}
 
-
-
-    def _aggregate_results(self, all_outputs_list: List[Dict[str, Any]], all_labels_list: List[Any], timing_records: List[float]) -> InferenceResult:
-        """
-        루프 종료 후 수집된 추론 산출물을 최종 공통 DTO 규격으로 고속 병합합니다.
-        정답지(Labels) 조립의 경우 차원에 대한 지식 없이 Evaluator에게 조립 권한을 위임합니다.
-        """
-        aggregated_outputs = {}
-        if all_outputs_list:
-            for out_key in all_outputs_list[0].keys():
-                aggregated_outputs[out_key] = np.concatenate([out[out_key] for out in all_outputs_list], axis=0)
-
-        # 안전하고 빠른 고속 라벨 배송 로직 (결합은 Evaluator가 자신의 도메인 규칙에 맞게 처리)
-        return InferenceResult(
-            outputs=aggregated_outputs,
-            timing_records=timing_records,
-            labels=all_labels_list
-        )
     def run(self, warmup_runs: int = 1, batch_size: int = 1, max_steps: int = None) -> Dict[str, Any]:
         """
         주입된 컴포넌트들을 연결하여 벤치마크 테스트 전체 루프를 수행합니다.
-        
+
+        스트리밍 평가 패턴:
+          배치마다 evaluator.add_batch() 호출 → 출력 텐서 즉시 GC 반환
+          루프 완료 후 evaluator.compute()로 최종 메트릭 산출
+
         Args:
             warmup_runs (int): 본 측정 전 Runtime 엔진을 예열하기 위한 횟수
             batch_size (int): 한 번에 묶어서 추론을 보낼 갯수
             max_steps (int): 옵션 - 지정된 횟수만큼만 루프를 돌고 탈출(테스트/리미터용)
-            
+
         Returns:
-            Dict[str, Any]: 최종 성능 종합 메트릭 리포트 (Evaluator 반환값)
+            Dict[str, Any]: 최종 성능 종합 메트릭 리포트 (Evaluator.compute() 반환값)
         """
         print("[BenchmarkRunner] 🚀 Starts benchmarking...")
-        
+
         # 모델 스펙에서 입력 노드 이름을 찾아 추출합니다. (단일 입력 가정)
         input_name = "input"
         if hasattr(self.runtime, 'compiled_model') and self.runtime.compiled_model is not None:
@@ -96,62 +86,51 @@ class BenchmarkRunner:
             warmup_batch = self.dataloader.load_batch(batch_size)
             if warmup_batch:
                 collated = self._collate_batch(warmup_batch)
-                
                 runtime_input = self._prepare_runtime_input(collated["input"], input_name)
                 self.runtime.warmup(runtime_input, num_runs=warmup_runs)
 
         # 본 실행을 위해 DataLoader 순회를 첫 번째 샘플로 되돌립니다.
         self.dataloader.current_idx = 0
 
-        # 2. Main Inference Loop
-        timing_records = []
-        all_outputs_list = []
-        all_labels_list = []
-
-        print("[BenchmarkRunner] ⚡ Running inference loop...")
+        # 2. Streaming Inference Loop
+        # ── 핵심 ─────────────────────────────────────────────────────────────────
+        # 이전: all_outputs_list에 모든 배치 출력을 RAM에 쌓은 뒤 한 번에 평가 (OOM 위험)
+        # 현재: 배치마다 evaluator.add_batch()로 경량 통계만 누산 → 출력 텐서 즉시 GC 반환
+        # ─────────────────────────────────────────────────────────────────────────
+        print("[BenchmarkRunner] ⚡ Running inference loop (streaming evaluation)...")
         batch_idx = 1
         while True:
             # 강제 종료 리미터 발동
             if max_steps is not None and batch_idx > max_steps:
                 print(f"[BenchmarkRunner] 🛑 사용자가 요청한 리미터에 도달했습니다! ({max_steps} steps) - 즉각 탈출하여 결과를 채점합니다.")
                 break
-                
-            # 지정된 크기만큼 데이터 확보 (메모리 OOM 방지)
+
             batch = self.dataloader.load_batch(batch_size)
             if not batch:
                 break
-                
+
             collated = self._collate_batch(batch)
-            
             runtime_input = self._prepare_runtime_input(collated["input"], input_name)
-            
-            # DataLoader가 던져준 원형(List, Tensor, Dict 등) 그대로 안전하게 적재
-            all_labels_list.append(collated["label"])
-            
-            # 단일 Batch 시간 정밀 측정 시작
+
+            # 단일 Batch 시간 정밀 측정
             start_time = time.perf_counter()
             outputs = self.runtime.run(runtime_input)
             end_time = time.perf_counter()
-            
-            # ms 단위 변환 저장
             latency_ms = (end_time - start_time) * 1000.0
-            timing_records.append(latency_ms)
-            all_outputs_list.append(outputs)
-            
+
+            # 스트리밍 평가: Evaluator가 outputs에서 경량 통계만 추출 후 텐서 즉시 폐기
+            self.evaluator.add_batch(outputs, collated["label"], latency_ms)
+
             if batch_idx % 10 == 0:
-                # Multi-input 딕셔너리일 경우 텐서의 0번째 축(배치) 길이를 구해 정확한 샘플 수 계측
                 if isinstance(collated["input"], dict):
                     first_key = next(iter(collated["input"]))
                     actual_batch_size = len(collated["input"][first_key])
                 else:
                     actual_batch_size = len(collated["input"])
-                    
                 print(f"  - Completed batch {batch_idx} ({actual_batch_size} samples), Latency: {latency_ms:.2f} ms")
             batch_idx += 1
-            
-        print("[BenchmarkRunner] 📊 Aggregating results...")
-        result_dto = self._aggregate_results(all_outputs_list, all_labels_list, timing_records)
-        
-        print("[BenchmarkRunner] 🏆 Evaluating metrics...")
-        metrics = self.evaluator.evaluate(result_dto)
+
+        # 3. 최종 메트릭 산출 (경량 누산 통계 → 최종 점수 계산)
+        print("[BenchmarkRunner] 🏆 Computing final metrics...")
+        metrics = self.evaluator.compute()
         return metrics
