@@ -5,6 +5,7 @@ from typing import Dict, Any
 from ..dataloader.base import DataLoader
 from ..runtimes.base import Runtime
 from ..evaluators.base import Evaluator
+from .model_spec import Task
 
 class BenchmarkRunner:
     """
@@ -16,14 +17,18 @@ class BenchmarkRunner:
     루프 종료 후 Evaluator.compute()로 최종 메트릭을 산출합니다.
     이로써 수백만 샘플을 처리해도 RAM 사용량이 선형으로 폭발하지 않습니다.
     """
-    def __init__(self, dataloader: DataLoader, runtime: Runtime, evaluator: Evaluator):
+    def __init__(self, dataloader: DataLoader, runtime: Runtime, evaluator: Evaluator,
+                 max_new_tokens: int = 256):
         self.dataloader = dataloader
         self.runtime = runtime
         self.evaluator = evaluator
+        self._max_new_tokens = max_new_tokens
 
         # DataLoader의 공식 메타데이터 계약(Contract)을 통해 Fast-Path 여부 확인
         metadata = self.dataloader.get_metadata()
         self.is_static_batched = metadata.get("is_static_batched", False)
+        # LLM 생성 중단 토큰 (없으면 None → max_new_tokens까지 생성)
+        self._stop_token_ids = metadata.get("stop_token_ids", None)
 
     def _collate_batch(self, batch_list: Any) -> Dict[str, Any]:
         """
@@ -92,6 +97,16 @@ class BenchmarkRunner:
         # 본 실행을 위해 DataLoader 순회를 첫 번째 샘플로 되돌립니다.
         self.dataloader.current_idx = 0
 
+        # LLM 여부 감지: NLP_GENERATION 태스크 + generate() 실제 지원 런타임이면 생성 경로 사용
+        _spec = getattr(getattr(self.runtime, 'compiled_model', None), 'spec', None)
+        is_llm = (
+            _spec is not None
+            and _spec.task == Task.NLP_GENERATION
+            and self.runtime.supports_generate()
+        )
+        if is_llm:
+            print(f"[BenchmarkRunner] 🤖 LLM 감지 (NLP_GENERATION) — generate() 경로 사용 (max_new_tokens={self._max_new_tokens})")
+
         # 2. Streaming Inference Loop
         # ── 핵심 ─────────────────────────────────────────────────────────────────
         # 이전: all_outputs_list에 모든 배치 출력을 RAM에 쌓은 뒤 한 번에 평가 (OOM 위험)
@@ -113,10 +128,23 @@ class BenchmarkRunner:
             runtime_input = self._prepare_runtime_input(collated["input"], input_name)
 
             # 단일 Batch 시간 정밀 측정
-            start_time = time.perf_counter()
-            outputs = self.runtime.run(runtime_input)
-            end_time = time.perf_counter()
-            latency_ms = (end_time - start_time) * 1000.0
+            if is_llm:
+                gen_result = self.runtime.generate(
+                    runtime_input, max_new_tokens=self._max_new_tokens,
+                    stop_token_ids=self._stop_token_ids,
+                )
+                outputs = {"generated_ids": gen_result.generated_ids}
+                # TTFT / TPOT / total_ms를 dict로 묶어 evaluator에 전달
+                latency_ms = {
+                    "total_ms": gen_result.total_ms,
+                    "ttft_ms":  gen_result.ttft_ms,
+                    "tpot_ms":  gen_result.tpot_ms,
+                }
+            else:
+                start_time = time.perf_counter()
+                outputs = self.runtime.run(runtime_input)
+                end_time = time.perf_counter()
+                latency_ms = (end_time - start_time) * 1000.0
 
             # 스트리밍 평가: Evaluator가 outputs에서 경량 통계만 추출 후 텐서 즉시 폐기
             self.evaluator.add_batch(outputs, collated["label"], latency_ms)
@@ -127,7 +155,11 @@ class BenchmarkRunner:
                     actual_batch_size = len(collated["input"][first_key])
                 else:
                     actual_batch_size = len(collated["input"])
-                print(f"  - Completed batch {batch_idx} ({actual_batch_size} samples), Latency: {latency_ms:.2f} ms")
+                if isinstance(latency_ms, dict):
+                    latency_display = f"total={latency_ms.get('total_ms', 0):.2f} ms, ttft={latency_ms.get('ttft_ms', 0):.2f} ms, tpot={latency_ms.get('tpot_ms', 0):.2f} ms"
+                else:
+                    latency_display = f"{latency_ms:.2f} ms"
+                print(f"  - Completed batch {batch_idx} ({actual_batch_size} samples), Latency: {latency_display}")
             batch_idx += 1
 
         # 3. 최종 메트릭 산출 (경량 누산 통계 → 최종 점수 계산)
