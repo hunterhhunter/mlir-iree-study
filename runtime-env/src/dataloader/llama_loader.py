@@ -177,9 +177,9 @@ class LlamaLoader(DataLoader):
         pos = np.maximum(np.cumsum(attn, axis=-1) - 1, 0).astype(np.int64)
         return {
             "input": {
-                "input_ids":      tensors["input_ids"].reshape(-1),
-                "attention_mask": attn.reshape(-1),
-                "position_ids":   pos.reshape(-1),
+                "input_ids":      tensors["input_ids"].reshape(1, -1),
+                "attention_mask": attn.reshape(1, -1),
+                "position_ids":   pos.reshape(1, -1),
             },
             "label": {
                 "id":                sample["qa_id"],
@@ -217,9 +217,9 @@ class LlamaLoader(DataLoader):
         pos = np.maximum(np.cumsum(attn, axis=-1) - 1, 0).astype(np.int64)
         return {
             "input": {
-                "input_ids":      tensors["input_ids"].reshape(-1),
-                "attention_mask": attn.reshape(-1),
-                "position_ids":   pos.reshape(-1),
+                "input_ids":      tensors["input_ids"].reshape(1, -1),
+                "attention_mask": attn.reshape(1, -1),
+                "position_ids":   pos.reshape(1, -1),
             },
             "label": {
                 "id":                sample["qa_id"],

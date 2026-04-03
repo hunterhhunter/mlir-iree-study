@@ -10,7 +10,26 @@ class BertQAEvaluator(Evaluator):
     OOM 방지를 위해 파이썬 for-loop를 완전 배제하고, DRY 원칙이 적용된 순수 Numpy 벡터화 로직만을 구동합니다.
     """
     def __init__(self, **eval_options):
-        pass
+        self._pred_starts: List[np.ndarray] = []
+        self._pred_ends: List[np.ndarray] = []
+        self._labels_list: List[Any] = []
+        self._timing_records: List[float] = []
+
+    def add_batch(self, outputs: Dict[str, np.ndarray], labels: Any, timing_ms: float) -> None:
+        self._pred_starts.append(np.argmax(outputs["start_logits"], axis=-1))
+        self._pred_ends.append(np.argmax(outputs["end_logits"], axis=-1))
+        self._labels_list.append(labels)
+        self._timing_records.append(timing_ms)
+
+    def compute(self) -> Dict[str, Any]:
+        pred_starts = np.concatenate(self._pred_starts)
+        pred_ends = np.concatenate(self._pred_ends)
+        true_starts, true_ends = self._parse_flattened_labels(self._labels_list)
+        total_samples = len(true_starts)
+        metrics = self._calculate_qa_metrics(pred_starts, pred_ends, true_starts, true_ends)
+        metrics["total_samples"] = total_samples
+        metrics.update(self._calculate_latency_metrics(self._timing_records, total_samples))
+        return metrics
 
     def evaluate(self, result: InferenceResult) -> Dict[str, Any]:
         """추론 결과(InferenceResult) DTO를 받아 EM과 F1 스코어를 채점합니다."""
