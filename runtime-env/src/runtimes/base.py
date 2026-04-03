@@ -1,7 +1,19 @@
 import abc
+import dataclasses
 import numpy as np
-from typing import Dict, Any
+from typing import Dict, Any, List, Optional
 from ..core.compiled_model import CompiledModel
+
+
+@dataclasses.dataclass(frozen=True)
+class GenerationResult:
+    """자기회귀 생성 결과 컨테이너."""
+    generated_ids: np.ndarray  # shape (num_tokens,), dtype int64
+    ttft_ms: float             # Time To First Token (근사값)
+    tpot_ms: float             # Time Per Output Token (근사값)
+    total_ms: float            # 전체 생성 시간
+    num_tokens: int            # 생성된 토큰 수
+
 
 class Runtime(abc.ABC):
     """
@@ -48,3 +60,12 @@ class Runtime(abc.ABC):
     def is_compatible(self, compiled_model: CompiledModel) -> bool:
         """현재 로드된 런타임 옵션으로 해당 아티팩트의 추론이 가능한지 동적으로 검사함."""
         pass
+
+    def supports_generate(self) -> bool:
+        """이 런타임이 generate()를 실제로 지원하는지 여부. 구현체에서 True로 오버라이드합니다."""
+        return False
+
+    def generate(self, inputs: Dict[str, np.ndarray], max_new_tokens: int = 256,
+                 stop_token_ids: Optional[List[int]] = None) -> GenerationResult:
+        """자기회귀 텍스트 생성. 이 메서드를 지원하는 백엔드만 오버라이드합니다."""
+        raise NotImplementedError("이 런타임은 generate()를 지원하지 않습니다.")
