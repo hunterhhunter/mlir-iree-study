@@ -177,9 +177,9 @@ class LlamaLoader(DataLoader):
         pos = np.maximum(np.cumsum(attn, axis=-1) - 1, 0).astype(np.int64)
         return {
             "input": {
-                "input_ids":      tensors["input_ids"].reshape(1, -1),
-                "attention_mask": attn.reshape(1, -1),
-                "position_ids":   pos.reshape(1, -1),
+                "input_ids":      tensors["input_ids"].reshape(-1),
+                "attention_mask": attn.reshape(-1),
+                "position_ids":   pos.reshape(-1),
             },
             "label": {
                 "id":                sample["qa_id"],
@@ -217,9 +217,9 @@ class LlamaLoader(DataLoader):
         pos = np.maximum(np.cumsum(attn, axis=-1) - 1, 0).astype(np.int64)
         return {
             "input": {
-                "input_ids":      tensors["input_ids"].reshape(1, -1),
-                "attention_mask": attn.reshape(1, -1),
-                "position_ids":   pos.reshape(1, -1),
+                "input_ids":      tensors["input_ids"].reshape(-1),
+                "attention_mask": attn.reshape(-1),
+                "position_ids":   pos.reshape(-1),
             },
             "label": {
                 "id":                sample["qa_id"],
@@ -238,6 +238,18 @@ class LlamaLoader(DataLoader):
         """
         return self._qa_labels
 
+    def _build_stop_token_ids(self) -> list:
+        """EOS + 줄바꿈 계열 토큰 ID 목록을 반환합니다."""
+        tok = self.preprocess_strategy.tokenizer
+        ids = set()
+        if tok.eos_token_id is not None:
+            ids.add(tok.eos_token_id)
+        for text in ["\n", "\n\n"]:
+            encoded = tok.encode(text, add_special_tokens=False)
+            if encoded:
+                ids.add(encoded[0])
+        return list(ids)
+
     def get_metadata(self) -> Dict[str, Any]:
         impossible_count = sum(1 for s in self.samples if s["is_impossible"])
         return {
@@ -247,6 +259,9 @@ class LlamaLoader(DataLoader):
             "dataset_path":        self.base_path,
             "max_length":          self.preprocess_strategy.max_length,
             "tokenizer_path":      self.preprocess_strategy.tokenizer.name_or_path,
+            "eos_token_id":        self.preprocess_strategy.tokenizer.eos_token_id,
+            # 줄바꿈/이중줄바꿈 토큰: "Answer:" 이후 한 줄 완성을 유도하는 프롬프트와 쌍을 이룸
+            "stop_token_ids":      self._build_stop_token_ids(),
             "cache_dir":           self.cache_dir,
             "preprocess_strategy": type(self.preprocess_strategy).__name__,
         }
