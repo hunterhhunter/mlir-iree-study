@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.2.0] - 2026-04-04
+
+### Fixed
+- `src/` 전체 21개 파일의 상대 임포트(`from ..X`) → 절대 임포트(`from X`)로 변환 — `python src/main.py` 실행 시 `ImportError: attempted relative import beyond top-level package` 오류 해결
+- `LlamaLoader`: `--dataset datasets/squad2/val.json`처럼 `.json` 파일 경로를 직접 전달하면 경로 끝에 `/val.json`이 중복 추가되던 버그 수정 (`datasets/squad2/val.json/val.json` → 올바르게 인식)
+
+### Added
+- `main.py`: `--max-model-len` CLI 옵션 추가 — vLLM 백엔드의 KV 캐시 메모리 부족 시 컨텍스트 길이를 제한할 수 있음 (예: `--max-model-len 32768`)
+- `models/download_llama_3_2_3b.py`, `models/download_llama_3_1_8b.py`, `models/download_resnet50_kalray.py`: 모델별 독립 다운로드 스크립트 추가
+
 ## [0.0.1.0] - 2026-04-04
 
 ### Changed
