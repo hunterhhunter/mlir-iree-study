@@ -8,7 +8,7 @@ GPU와 CPU 모드를 모두 지원합니다.
 사전 준비:
     1. HuggingFace 로그인: huggingface-cli login
     2. 모델 다운로드 (HuggingFace 가중치 — ONNX 불필요):
-       python models/download_model_from_huggingface.py \
+       python models/download_hf_model.py \
            --name meta-llama/Llama-3.2-3B-Instruct \
            --output models
     3. vLLM 설치:
@@ -53,7 +53,7 @@ MODEL_DIR_CANDIDATES = [
     os.path.join(project_root, "models", "Llama-3.2-3B"),
 ]
 
-DATASET_PATH = os.path.join(project_root, "datasets", "SQuAD_2")
+DATASET_PATH = os.path.join(project_root, "datasets", "squad2")
 CACHE_DIR = os.path.join(DATASET_PATH, ".cache_npz_vllm")
 
 # 추론 설정
@@ -206,7 +206,7 @@ def main():
         print("\n[!] Llama 3.2 3B HuggingFace 가중치를 찾을 수 없습니다.")
         print("    다음 명령으로 모델을 먼저 다운로드하세요:\n")
         print(
-            "    python models/download_model_from_huggingface.py \\\n"
+            "    python models/download_hf_model.py \\\n"
             "        --name meta-llama/Llama-3.2-3B-Instruct \\\n"
             "        --output models\n"
         )

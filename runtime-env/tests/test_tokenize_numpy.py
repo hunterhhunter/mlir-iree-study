@@ -5,9 +5,9 @@ import numpy as np
 import pytest
 from pathlib import Path
 
-# scripts 패키지 모듈을 로드하기 위해 임시 경로 추가
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../scripts")))
-import tokenize_to_numpy
+# datasets 패키지 모듈을 로드하기 위해 임시 경로 추가 (scripts/tokenize_to_numpy.py → datasets/prepare_text_numpy.py)
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../datasets")))
+import prepare_text_numpy
 
 def test_universal_tokenizer_with_mock_csv(tmp_path, monkeypatch):
     """
@@ -30,7 +30,7 @@ def test_universal_tokenizer_with_mock_csv(tmp_path, monkeypatch):
     
     # 3. argparse 파라미터 오버라이딩 (명령줄 입력 시뮬레이션)
     test_args = [
-        "tokenize_to_numpy.py",
+        "prepare_text_numpy.py",
         "--model-id", "bert-base-uncased",
         "--seq-len", "128",
         "--csv-file", str(mock_csv_path),
@@ -41,7 +41,7 @@ def test_universal_tokenizer_with_mock_csv(tmp_path, monkeypatch):
     monkeypatch.setattr(sys, "argv", test_args)
     
     # 4. 전처리 메인 파이프라인 실행
-    tokenize_to_numpy.main()
+    prepare_text_numpy.main()
     
     # 5. [파일 생성 검증] 3종의 Numpy 배열이 디스크에 생성되었는가?
     id_path = output_dir / "input_ids.npy"

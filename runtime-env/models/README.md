@@ -6,16 +6,16 @@
 
 ## 🚀 1. 모델 다운로드 스크립트
 
-### `download_model_from_huggingface.py`
+### `download_hf_model.py`
 Hugging Face 레포지토리의 전체 파일을 로컬 디렉토리로 스냅샷 다운로드합니다. 이 스크립트를 사용하면 매번 인터넷에서 불러오는 네트워크 오버헤드를 줄이고 오프라인 환경에서 테스트를 돌리기 편해집니다.
 
 * **사용 예시**:
 ```bash
 # 기본 사용 (전체 모델 로드)
-uv run models/download_model_from_huggingface.py --name ibm-granite/granite-timeseries-patchtst
+uv run models/download_hf_model.py --name ibm-granite/granite-timeseries-patchtst
 
 # 특정 포맷(onnx) 파일과 기본 JSON들만 필터링해서 다운로드 (용량 절약)
-uv run models/download_model_from_huggingface.py --name meta-llama/Llama-3.1-8B-Instruct --format safetensors
+uv run models/download_hf_model.py --name meta-llama/Llama-3.1-8B-Instruct --format safetensors
 ```
 * 다운로드된 파일은 기본적으로 `models/[저장소 구조]` 형태로 보관됩니다. (예: `models/ibm-granite_granite-timeseries-patchtst`)
 
@@ -29,7 +29,7 @@ uv run models/download_yolov5m.py
 
 ## 🛠 2. ONNX 변환 (Export) 스크립트
 
-### `export_onnx_optimum.py`
+### `export_onnx_hf.py`
 Hugging Face의 `optimum-cli`의 파이썬 래퍼(Wrapper) 스크립트입니다. Hugging Face 생태계에 편입된 대부분의 모델(ResNet, LLaMA 등)을 손쉽게 ONNX 포맷으로 추출합니다.
 
 * **매개변수**:
@@ -39,7 +39,7 @@ Hugging Face의 `optimum-cli`의 파이썬 래퍼(Wrapper) 스크립트입니다
 
 * **사용 예시** (ResNet-50을 이미지 분류 모델로 Export):
 ```bash
-uv run models/export_onnx_optimum.py \
+uv run models/export_onnx_hf.py \
     --model microsoft/resnet-50 \
     --task image-classification \
     --output models/microsoft_resnet-50-ONNX \

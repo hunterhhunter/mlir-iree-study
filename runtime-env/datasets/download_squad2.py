@@ -2,7 +2,7 @@ import os
 import urllib.request
 
 def download_squad2():
-    base_dir = os.path.join("datasets", "SQuAD_2")
+    base_dir = os.path.join("datasets", "squad2")
     os.makedirs(base_dir, exist_ok=True)
     
     url = "https://rajpurkar.github.io/SQuAD-explorer/dataset/dev-v2.0.json"

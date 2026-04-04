@@ -21,7 +21,7 @@ class BertClassificationLoader(DataLoader):
 
         for path in [id_path, mask_path, label_path]:
             if not os.path.exists(path):
-                raise FileNotFoundError(f"[Error] 필수 배열 파일 누락: {path}. tokenize_to_numpy.py를 먼저 실행하세요.")
+                raise FileNotFoundError(f"[Error] 필수 배열 파일 누락: {path}. prepare_text_numpy.py를 먼저 실행하세요.")
 
         # O(1) 로딩 (mmap_mode='r'):
         # 디스크의 거대한 Numpy 배열을 실제 RAM에 올리지 않고, C언어 포인터처럼 가상 주소 체계로 연결.

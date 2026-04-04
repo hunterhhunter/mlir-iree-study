@@ -10,7 +10,7 @@ CompiledModel.artifact_path로 받아 vLLM LLM 엔진을 초기화합니다.
 """
 
 import time
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, List, Optional, Union
 
 import numpy as np
 
@@ -102,7 +102,7 @@ class VllmRuntime(Runtime):
         self,
         inputs: Dict[str, np.ndarray],
         max_new_tokens: int = 256,
-        eos_token_id: Union[int, List[int], None] = None,
+        stop_token_ids: Union[List[int], None] = None,
     ) -> GenerationResult:
         """
         vLLM 오프라인 배치 추론을 통한 자기회귀 생성 (Greedy Decoding).
@@ -116,7 +116,7 @@ class VllmRuntime(Runtime):
         Args:
             inputs:         'input_ids' (1, padded_len), 'attention_mask' (1, padded_len) 포함 dict
             max_new_tokens: 최대 생성 토큰 수
-            eos_token_id:   조기 종료 토큰 ID (int 또는 list)
+            stop_token_ids: 조기 종료 토큰 ID 리스트 (예: [eos_id])
 
         Returns:
             GenerationResult: generated_ids, ttft_ms, tpot_ms, total_ms, num_tokens
@@ -129,12 +129,9 @@ class VllmRuntime(Runtime):
         if self._llm is None:
             raise RuntimeError("vLLM engine is not loaded. Call load() first.")
 
-        # eos_token_id → stop_token_ids 변환
-        stop_token_ids: List[int] | None = None
-        if eos_token_id is not None:
-            stop_token_ids = (
-                eos_token_id if isinstance(eos_token_id, list) else [eos_token_id]
-            )
+        # stop_token_ids 정규화: None이 아니면 그대로 사용
+        if stop_token_ids is not None and not isinstance(stop_token_ids, list):
+            stop_token_ids = [stop_token_ids]
 
         sampling_params = SamplingParams(
             max_tokens=max_new_tokens,

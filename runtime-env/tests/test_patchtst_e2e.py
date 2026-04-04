@@ -6,7 +6,7 @@ ETTm1 데이터셋을 사용하여 granite-timeseries-patchtst ONNX 모델의
 
 사전 준비:
     1. 모델 다운로드:
-       python models/download_model_from_huggingface.py \
+       python models/download_hf_model.py \
            --name ibm-granite/granite-timeseries-patchtst --output models
 
     2. ONNX export:
