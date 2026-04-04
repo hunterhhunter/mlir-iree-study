@@ -5,7 +5,7 @@ DataLoader Package Initialization & Factory
 DataLoader 클래스들에 대한 손쉬운 접근(단일 진입점 API)을 제공합니다.
 """
 
-from ..core.model_spec import Model_Spec, Task
+from core.model_spec import Model_Spec, Task
 from .base import DataLoader
 from .image_classification_loader import ImageClassificationLoader
 from .object_detection_loader import ObjectDetectionLoader

@@ -5,7 +5,7 @@ Evaluator Package Initialization & Factory
 평가기(Evaluator) 인스턴스를 동적으로 생성하고 접근할 수 있는 단일 진입점 API를 제공합니다.
 """
 
-from ..core.model_spec import Model_Spec, Task
+from core.model_spec import Model_Spec, Task
 from .base import Evaluator
 from .image_classification_evaluator import ImageClassificationEvaluator
 from .llama_evaluator import LlamaEvaluator

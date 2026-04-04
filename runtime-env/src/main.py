@@ -8,15 +8,15 @@ project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 if project_root not in sys.path:
     sys.path.append(project_root)
 
-from src.core.model_spec import Model_Spec, Task
-from src.core.model_profiles import create_model_spec
-from src.core.compiled_model import CompiledModel
-from src.core.benchmarkrunner import BenchmarkRunner
+from core.model_spec import Model_Spec, Task
+from core.model_profiles import create_model_spec
+from core.compiled_model import CompiledModel
+from core.benchmarkrunner import BenchmarkRunner
 
 # 구체화된 컴포넌트 임포트 (Facade Pattern 적용)
-from src.dataloader import create_dataloader
-from src.evaluators import create_evaluator
-from src.runtimes import create_runtime
+from dataloader import create_dataloader
+from evaluators import create_evaluator
+from runtimes import create_runtime
 # from src.runtimes.iree_rt import IREERuntime  # 향후 IREE 백엔드 추가 시 주석 해제
 
 
@@ -36,6 +36,7 @@ def main():
     parser.add_argument("--warmup", "-w", type=int, default=2, help="웜업 횟수 (기본: 2)")
     parser.add_argument("--max-steps", type=int, default=None, help="시간이 지루할 때 쓸 강제 종료 리미트 (옵션)")
     parser.add_argument("--max-new-tokens", type=int, default=256, help="LLM 생성 최대 토큰 수 (기본: 256)")
+    parser.add_argument("--max-model-len", type=int, default=None, help="vLLM 최대 컨텍스트 길이 (기본: 모델 기본값, 메모리 부족 시 줄이세요)")
     parser.add_argument("--debug", action="store_true", help="샘플별 예측/정답/점수 로그 출력 (기본: 비활성)")
     
     args = parser.parse_args()
@@ -63,7 +64,7 @@ def main():
                 sys.exit(1)
         
     # [설계 개선] CLI 인자(--task)에 의존하지 않고, 레지스트리(SUPPORTED_PROFILES)에서 태스크를 자동 추론 (DRY 원칙)
-    from src.core.model_profiles import SUPPORTED_PROFILES
+    from core.model_profiles import SUPPORTED_PROFILES
     profile = SUPPORTED_PROFILES.get(args.model)
     if not profile:
         print(f"[Error] '{args.model}' 프로필을 찾을 수 없습니다. model_profiles.py에 등록되었는지 확인하세요.")
@@ -78,7 +79,7 @@ def main():
     print("="*60)
     
     # 0. DataLoader 공통 인터페이스 규약 및 CoC 해소 (Resolver)
-    from src.utils.dataset_resolver import resolve_dataset_paths
+    from utils.dataset_resolver import resolve_dataset_paths
     image_dir, label_path = resolve_dataset_paths(task_enum, args.dataset, args.image_dir, args.label_dir)
     
     loader_kwargs = {}
@@ -114,7 +115,10 @@ def main():
     
     # 런타임 팩토리 로직
     try:
-        runtime = create_runtime(args.backend, device=args.device)
+        runtime_kwargs = {}
+        if args.max_model_len is not None:
+            runtime_kwargs["max_model_len"] = args.max_model_len
+        runtime = create_runtime(args.backend, device=args.device, **runtime_kwargs)
     except Exception as e:
         print(f"[Error] {e}")
         sys.exit(1)

@@ -1,7 +1,7 @@
 import numpy as np
 from typing import Dict, Any
 
-from ..utils.cuda_preload import preload_cuda_libs
+from utils.cuda_preload import preload_cuda_libs
 
 # onnxruntime import 전에 CUDA 라이브러리를 사전 로드합니다.
 # 자세한 내용은 src/utils/cuda_preload.py 참조.
@@ -11,7 +11,7 @@ import onnxruntime as ort
 
 import time
 from .base import Runtime, GenerationResult
-from ..core.compiled_model import CompiledModel
+from core.compiled_model import CompiledModel
 
 class OnnxRuntime(Runtime):
     """
@@ -95,7 +95,7 @@ class OnnxRuntime(Runtime):
         print(f"[ONNX Runtime] Warming up {num_runs} times on {self.device}...")
         # LLM 패딩 trim: NLP_GENERATION 태스크에서만 실제 토큰 길이로 슬라이싱
         # BERT 등 고정 seq_len 모델에 적용하면 shape mismatch가 발생하므로 반드시 분기
-        from ..core.model_spec import Task
+        from core.model_spec import Task
         warmup_inputs = dict(inputs)
         is_llm = (
             self.compiled_model is not None

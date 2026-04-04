@@ -11,7 +11,7 @@ import numpy as np
 from PIL import Image
 from typing import Dict, List, Any, Tuple
 from .base import DataLoader
-from ..core.model_spec import Model_Spec
+from core.model_spec import Model_Spec
 
 class ObjectDetectionLoader(DataLoader):
     def __init__(self, model_spec: Model_Spec, **kwargs):

@@ -12,7 +12,7 @@ from typing import Any, Dict, List, Optional
 import numpy as np
 
 from .base import Evaluator
-from ..core.inference_result import InferenceResult
+from core.inference_result import InferenceResult
 
 
 class TimeSeriesForecastingEvaluator(Evaluator):
@@ -149,7 +149,7 @@ class TimeSeriesForecastingEvaluator(Evaluator):
         return float(np.mean(lat)), float(np.percentile(lat, 99))
 
     def is_applicable(self, device_spec: Any, model_spec: Any) -> bool:
-        from ..core.model_spec import Task
+        from core.model_spec import Task
         return model_spec.task == Task.TIME_SERIES_FORECASTING
 
     def get_metric_names(self) -> List[str]:
