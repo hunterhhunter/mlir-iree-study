@@ -95,6 +95,9 @@ class VllmRuntime(Runtime):
         gen_result = self.generate(inputs, max_new_tokens=1)
         return {"generated_ids": gen_result.generated_ids}
 
+    def supports_generate(self) -> bool:
+        return True
+
     def generate(
         self,
         inputs: Dict[str, np.ndarray],

@@ -56,5 +56,14 @@ def resolve_dataset_paths(task: Task, dataset_path: str, image_dir_arg: str, lab
     elif task == Task.NLP_CLASSIFICATION:
         # NLP 파이프라인은 image_dir, label_dir 비전 전용 경로가 무의미하므로 무시
         pass
-        
+
+    elif task == Task.NLP_GENERATION:
+        # LlamaLoader가 dataset_path 하위 val.json을 직접 탐색하므로 특별 처리 불필요
+        pass
+
+    elif task == Task.TIME_SERIES_FORECASTING:
+        # ETTmLoader가 csv_path kwarg를 필요로 함.
+        # main.py에서 loader_kwargs["csv_path"] = args.dataset 로 전달하므로 여기서는 pass.
+        pass
+
     return image_dir, label_path

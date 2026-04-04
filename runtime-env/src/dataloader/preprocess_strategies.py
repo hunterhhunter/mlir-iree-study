@@ -127,13 +127,6 @@ class SQuADPreprocessStrategy(PreprocessStrategy):
     토큰화하여 input_ids / attention_mask numpy 배열을 반환합니다.
     """
 
-    SYSTEM_PROMPT = (
-        "You are a helpful assistant for question answering. "
-        "Answer based only on the provided context. "
-        "If the answer cannot be determined from the context, "
-        'respond with "I cannot answer this question based on the given context."'
-    )
-
     def __init__(self, tokenizer_path: str, max_length: int = 4096):
         """
         Args:
@@ -161,17 +154,22 @@ class SQuADPreprocessStrategy(PreprocessStrategy):
         )
 
     def _build_prompt(self, question: str, context: str) -> str:
-        """LLaMA 3.1 Chat Template 형식의 프롬프트를 조립합니다."""
+        """
+        SQuAD 2.0 QA 전용 plain-text few-shot 프롬프트.
+
+        Chat-template 토큰(<|begin_of_text|> 등)을 사용하지 않습니다.
+        Base 모델과 Instruct 모델 모두에서 동작하며, 모델이 "Answer:" 이후를
+        짧은 추출 답변으로 완성(completion)하도록 유도합니다.
+        """
         return (
-            "<|begin_of_text|>"
-            "<|start_header_id|>system<|end_header_id|>\n\n"
-            f"{self.SYSTEM_PROMPT}"
-            "<|eot_id|>"
-            "<|start_header_id|>user<|end_header_id|>\n\n"
-            f"Context: {context}\n\n"
-            f"Question: {question}"
-            "<|eot_id|>"
-            "<|start_header_id|>assistant<|end_header_id|>\n\n"
+            "Extract the shortest possible answer from the passage.\n"
+            "If the passage does not contain enough information, respond with \"unanswerable\".\n\n"
+            "Passage: The capital of France is Paris.\n"
+            "Question: What is the capital of France?\n"
+            "Answer: Paris\n\n"
+            f"Passage: {context}\n"
+            f"Question: {question}\n"
+            "Answer:"
         )
 
     def tokenize(

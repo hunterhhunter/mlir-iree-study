@@ -37,6 +37,13 @@ SUPPORTED_PROFILES: Dict[str, Dict[str, Any]] = {
         "input_dtype": {"input_ids": "int64", "attention_mask": "int64"},
         "output_shapes": {"logits": (1, 128, 32000)}
     },
+    "llama-3.2-3b": {
+        "task": Task.NLP_GENERATION,
+        "input_shapes": {"input_ids": (1, 4096), "attention_mask": (1, 4096)},
+        "input_dtype": {"input_ids": "int64", "attention_mask": "int64"},
+        # Llama 3.x vocab = 128,256
+        "output_shapes": {"logits": (1, 4096, 128256)},
+    },
     "bert-base-uncased-squad-v1": {
         "task": Task.QUESTION_ANSWERING,
         "input_shapes": {"input_ids": (1, 384), "attention_mask": (1, 384)},

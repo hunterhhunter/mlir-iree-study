@@ -5,9 +5,10 @@ Runtime Package Initialization & Factory
 다양한 Runtime 엔진(ONNX, IREE 등)에 대한 손쉬운 접근(단일 진입점 API)을 제공합니다.
 """
 
-from .base import Runtime
+from .base import Runtime, GenerationResult
 from .onnx_rt import OnnxRuntime
 from .iree_rt import IREERuntime
+from .vllm_rt import VllmRuntime
 
 def create_runtime(backend_name: str, device: str = "cpu", **kwargs) -> Runtime:
     """
@@ -33,12 +34,16 @@ def create_runtime(backend_name: str, device: str = "cpu", **kwargs) -> Runtime:
         # Base Runtime 인터페이스 호환을 위한 리팩토링이 선행되어야 완벽히 동작합니다.
         # return IREERuntime(device=device, **kwargs)
         raise NotImplementedError("IREE 런타임은 현재 공통 인터페이스 맞춤 리팩토링 중입니다.")
+    elif backend in ["vllm"]:
+        return VllmRuntime(device=device, **kwargs)
     else:
         raise ValueError(f"지원하지 않는 백엔드입니다: {backend_name}")
 
 __all__ = [
     "Runtime",
+    "GenerationResult",
     "OnnxRuntime",
     "IREERuntime",
+    "VllmRuntime",
     "create_runtime"
 ]
