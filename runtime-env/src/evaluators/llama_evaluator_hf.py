@@ -5,8 +5,8 @@ import numpy as np
 from transformers import AutoTokenizer
 
 from .base import Evaluator
-from ..core.model_spec import Model_Spec, Task
-from ..core.inference_result import InferenceResult
+from core.model_spec import Model_Spec, Task
+from core.inference_result import InferenceResult
 
 
 class LlamaEvaluatorHF(Evaluator):

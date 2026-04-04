@@ -21,7 +21,7 @@ import numpy as np
 
 from .base import DataLoader
 from .preprocess_strategies import SQuADPreprocessStrategy
-from ..core.model_spec import Model_Spec
+from core.model_spec import Model_Spec
 
 
 class LlamaLoader(DataLoader):
@@ -51,9 +51,13 @@ class LlamaLoader(DataLoader):
 
         # 1. 경로 설정
         self.base_path = kwargs.get("dataset_path", "./datasets/squad2")
-        squad_json = kwargs.get(
-            "squad_json", os.path.join(self.base_path, "val.json")
-        )
+        squad_json = kwargs.get("squad_json", None)
+        if squad_json is None:
+            # dataset_path가 .json 파일 직접 경로인 경우 그대로 사용
+            if self.base_path.endswith(".json"):
+                squad_json = self.base_path
+            else:
+                squad_json = os.path.join(self.base_path, "val.json")
 
         # 2. 전처리 전략 초기화
         if "preprocess_strategy" in kwargs:

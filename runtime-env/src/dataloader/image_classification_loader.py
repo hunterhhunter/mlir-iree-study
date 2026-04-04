@@ -20,7 +20,7 @@ from .preprocess_strategies import (
     MLPerfResNet50Preprocess,
     DirectResizePreprocess,
 )
-from ..core.model_spec import Model_Spec
+from core.model_spec import Model_Spec
 
 # 범용 ImageNet 정규화 상수 (기본 폴백 용도)
 IMAGENET_MEAN = (0.485, 0.456, 0.406)

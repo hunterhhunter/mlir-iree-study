@@ -1,6 +1,6 @@
 import os
 from typing import Tuple
-from src.core.model_spec import Task
+from core.model_spec import Task
 
 def resolve_dataset_paths(task: Task, dataset_path: str, image_dir_arg: str, label_dir_arg: str) -> Tuple[str, str]:
     """

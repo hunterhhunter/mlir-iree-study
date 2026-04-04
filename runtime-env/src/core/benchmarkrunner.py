@@ -2,9 +2,9 @@ import time
 import numpy as np
 from typing import Dict, Any
 
-from ..dataloader.base import DataLoader
-from ..runtimes.base import Runtime
-from ..evaluators.base import Evaluator
+from dataloader.base import DataLoader
+from runtimes.base import Runtime
+from evaluators.base import Evaluator
 from .model_spec import Task
 
 class BenchmarkRunner:

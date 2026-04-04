@@ -29,7 +29,7 @@ import numpy as np
 
 from .base import DataLoader
 from .preprocess_strategies import TimeSeriesPreprocessStrategy
-from ..core.model_spec import Model_Spec
+from core.model_spec import Model_Spec
 
 
 # ETTm1 데이터 컬럼 (date 제외)

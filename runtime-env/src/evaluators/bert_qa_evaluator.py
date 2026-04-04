@@ -1,8 +1,8 @@
 import numpy as np
 from typing import Dict, Any, List, Tuple
 from .base import Evaluator
-from ..core.model_spec import Model_Spec
-from ..core.inference_result import InferenceResult
+from core.model_spec import Model_Spec
+from core.inference_result import InferenceResult
 
 class BertQAEvaluator(Evaluator):
     """

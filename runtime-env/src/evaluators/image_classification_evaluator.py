@@ -3,8 +3,8 @@ from typing import Dict, Any, List, Tuple
 from sklearn.metrics import precision_recall_fscore_support
 
 from .base import Evaluator
-from ..core.model_spec import Model_Spec
-from ..core.inference_result import InferenceResult
+from core.model_spec import Model_Spec
+from core.inference_result import InferenceResult
 
 class ImageClassificationEvaluator(Evaluator):
     """

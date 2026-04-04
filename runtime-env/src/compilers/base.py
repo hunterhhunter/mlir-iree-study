@@ -3,7 +3,7 @@ from typing import Any, Dict
 import os
 
 # ..core.model_spec 가 존재한다고 가정
-from ..core.model_spec import Model_Spec
+from core.model_spec import Model_Spec
 
 class Compiler(ABC):
     """

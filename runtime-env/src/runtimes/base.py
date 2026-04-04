@@ -2,7 +2,7 @@ import abc
 import dataclasses
 import numpy as np
 from typing import Dict, Any, List, Optional
-from ..core.compiled_model import CompiledModel
+from core.compiled_model import CompiledModel
 
 
 @dataclasses.dataclass(frozen=True)

@@ -6,7 +6,7 @@ import onnx
 import iree.compiler.tools as ireec
 
 from .base import Compiler
-from ..core.model_spec import Model_Spec
+from core.model_spec import Model_Spec
 
 class IREECompiler(Compiler):
     def __init__(self, **compile_options):
