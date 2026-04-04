@@ -7,7 +7,7 @@ SQuAD 2.0 데이터셋을 사용하여 Llama 3.1 8B ONNX 모델의
 사전 준비:
     1. HuggingFace 로그인: huggingface-cli login
     2. 모델 다운로드:
-       python models/download_model_from_huggingface.py \
+       python models/download_hf_model.py \
            --name onnx-community/Llama-3.2-3B-Instruct-ONNX \
            --format onnx --output models
 
@@ -38,7 +38,7 @@ from src.evaluators import LlamaEvaluator
 MODEL_DIR_A = os.path.join(
     project_root, "models", "onnx-community_Llama-3.1-8B-Instruct-ONNX"
 )
-# 방법 B: pt/safetensors 다운로드 후 export_onnx_optimum.py 로 변환한 경우
+# 방법 B: pt/safetensors 다운로드 후 export_onnx_hf.py 로 변환한 경우
 MODEL_DIR_B = os.path.join(
     project_root, "models", "meta-llama_Llama-3.1-8B-ONNX-int8"
 )
@@ -48,7 +48,7 @@ MODEL_DIR_C = os.path.join(
     project_root, "models", "meta-llama_Llama-3.2-3B-ONNX"
 )
 
-DATASET_PATH = os.path.join(project_root, "datasets", "SQuAD_2")
+DATASET_PATH = os.path.join(project_root, "datasets", "squad2")
 CACHE_DIR = os.path.join(DATASET_PATH, ".cache_npz")
 
 # 추론 설정
@@ -101,7 +101,7 @@ def main():
         print("\n[!] Llama 3.1 8B ONNX 모델을 찾을 수 없습니다.")
         print("    다음 명령으로 모델을 먼저 다운로드하세요:\n")
         print(
-            "    python models/download_model_from_huggingface.py \\\n"
+            "    python models/download_hf_model.py \\\n"
             "        --name onnx-community/Llama-3.1-8B-Instruct-ONNX \\\n"
             "        --format onnx --output models\n"
         )

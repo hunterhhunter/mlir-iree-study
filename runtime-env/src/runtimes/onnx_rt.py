@@ -93,9 +93,15 @@ class OnnxRuntime(Runtime):
         실제 측정 전, Cold-start 지연 시간을 제거.
         """
         print(f"[ONNX Runtime] Warming up {num_runs} times on {self.device}...")
-        # LLM 패딩 trim: attention_mask가 있으면 실제 토큰 길이로 슬라이싱
+        # LLM 패딩 trim: NLP_GENERATION 태스크에서만 실제 토큰 길이로 슬라이싱
+        # BERT 등 고정 seq_len 모델에 적용하면 shape mismatch가 발생하므로 반드시 분기
+        from ..core.model_spec import Task
         warmup_inputs = dict(inputs)
-        if "attention_mask" in inputs and "input_ids" in inputs:
+        is_llm = (
+            self.compiled_model is not None
+            and self.compiled_model.spec.task == Task.NLP_GENERATION
+        )
+        if is_llm and "attention_mask" in inputs and "input_ids" in inputs:
             real_len = int(inputs["attention_mask"].sum())
             total_len = inputs["input_ids"].shape[-1]
             if real_len < total_len:

@@ -50,7 +50,7 @@ class LlamaLoader(DataLoader):
         self.model_spec = model_spec
 
         # 1. 경로 설정
-        self.base_path = kwargs.get("dataset_path", "./datasets/SQuAD_2")
+        self.base_path = kwargs.get("dataset_path", "./datasets/squad2")
         squad_json = kwargs.get(
             "squad_json", os.path.join(self.base_path, "val.json")
         )
