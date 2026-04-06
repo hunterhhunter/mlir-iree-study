@@ -5,13 +5,13 @@ optimum-cli 없이 순수 transformers + torch.onnx.export로 PatchTST 계열 �
 
 사용법:
     # 로컬 모델 디렉토리 (patchtst_fm config를 PatchTSTConfig로 변환하여 로드)
-    uv run models/export_onnx_patchtst.py \
+    uv run models/prepare_patchtst.py \
         --model models/ibm-research_patchtst-fm-r1/ \
         --output models/ibm-research_patchtst-fm-r1-ONNX/model.onnx \
         --context-length 512 --channels 7 --prediction-length 96
 
     # HuggingFace 모델 ID 직접 사용
-    uv run models/export_onnx_patchtst.py \
+    uv run models/prepare_patchtst.py \
         --model ibm-granite/granite-timeseries-patchtst \
         --output models/patchtst-ONNX/model.onnx
 """
