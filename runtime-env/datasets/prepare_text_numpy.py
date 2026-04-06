@@ -34,7 +34,7 @@ def main():
     parser.add_argument("--text-column", type=str, default="sentence", help="데이터 안에서 문장이 담긴 열의 이름")
     parser.add_argument("--label-column", type=str, default="label", help="데이터 안에서 정답이 담긴 열의 이름")
     
-    parser.add_argument("--output-dir", "-o", type=str, default=os.path.join(os.path.dirname(__file__), "../datasets/baked_numpy"), help="npy 파일 저장 경로")
+    parser.add_argument("--output-dir", "-o", type=str, default=os.path.join(os.path.dirname(__file__), "../datasets/sst2_numpy"), help="npy 파일 저장 경로")
     args = parser.parse_args()
 
     # 1. 원본 데이터셋 로드 (HuggingFace Hub OR 로컬 CSV)

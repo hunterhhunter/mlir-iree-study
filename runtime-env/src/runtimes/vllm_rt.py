@@ -15,7 +15,8 @@ from typing import Any, Dict, List, Optional, Union
 import numpy as np
 
 from core.compiled_model import CompiledModel
-from .base import GenerationResult, Runtime
+from .base import Runtime
+from core.generation_result import GenerationResult
 
 
 class VllmRuntime(Runtime):

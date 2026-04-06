@@ -16,44 +16,64 @@ SUPPORTED_PROFILES: Dict[str, Dict[str, Any]] = {
         "task": Task.IMAGE_CLASSIFICATION,
         "input_shapes": {"__auto__": (1, 3, 224, 224)},
         "input_dtype": {"__auto__": "float32"},
-        "output_shapes": {"__auto__": (1, 1000)}
+        "output_shapes": {"__auto__": (1, 1000)},
+        "default_model_path": "models/Kalray_resnet50/resnet50-v1-7s.onnx",
+        "default_dataset_path": "datasets/imagenet_1k",
+        "prepare_model_script": "models/prepare_resnet50_kalray.py",
+        "prepare_dataset_script": "datasets/prepare_imagenet_1k.py"
     },
     "yolov5m": {
         "task": Task.OBJECT_DETECTION,
         "input_shapes": {"__auto__": (1, 3, 640, 640)},
         "input_dtype": {"__auto__": "float32"},
-        "output_shapes": {"__auto__": (1, 25200, 85)}
+        "output_shapes": {"__auto__": (1, 25200, 85)},
+        "default_model_path": "models/yolov5m/yolov5m.onnx",
+        "default_dataset_path": "datasets/coco128",
+        "prepare_model_script": "models/prepare_yolov5m.py",
+        "prepare_dataset_script": "datasets/prepare_coco128.py"
     },
     "bert-base-uncased": {
         "task": Task.NLP_CLASSIFICATION,
-        # NLP 처리 등 다중 입력(Multiple Inputs)의 구조가 복잡한 모델은 __auto__ 대신 명시적 선언
         "input_shapes": {"input_ids": (1, 128), "attention_mask": (1, 128)},
         "input_dtype": {"input_ids": "int64", "attention_mask": "int64"},
-        "output_shapes": {"logits": (1, 2)}
+        "output_shapes": {"logits": (1, 2)},
+        "default_model_path": "models/bert-base-uncased/bert_sst2.onnx",
+        "default_dataset_path": "datasets/sst2_numpy",
+        "prepare_model_script": "models/prepare_bert_sst2.py",
+        "prepare_dataset_script": "datasets/prepare_text_numpy.py"
     },
     "llama-3.1-8b": {
         "task": Task.NLP_GENERATION,
         "input_shapes": {"input_ids": (1, 128), "attention_mask": (1, 128)},
         "input_dtype": {"input_ids": "int64", "attention_mask": "int64"},
-        "output_shapes": {"logits": (1, 128, 32000)}
+        "output_shapes": {"logits": (1, 128, 32000)},
+        "default_model_path": "models/meta-llama_Llama-3.1-8B",
+        "default_dataset_path": "datasets/squad2/val.json",
+        "prepare_model_script": "models/prepare_llama_3_1_8b.py",
+        "prepare_dataset_script": "datasets/prepare_squad2.py"
     },
     "llama-3.2-3b": {
         "task": Task.NLP_GENERATION,
         "input_shapes": {"input_ids": (1, 4096), "attention_mask": (1, 4096)},
         "input_dtype": {"input_ids": "int64", "attention_mask": "int64"},
-        # Llama 3.x vocab = 128,256
         "output_shapes": {"logits": (1, 4096, 128256)},
+        "default_model_path": "models/meta-llama_Llama-3.2-3B",
+        "default_dataset_path": "datasets/squad2/val.json",
+        "prepare_model_script": "models/prepare_llama_3_2_3b.py",
+        "prepare_dataset_script": "datasets/prepare_squad2.py"
     },
     "bert-base-uncased-squad-v1": {
         "task": Task.QUESTION_ANSWERING,
         "input_shapes": {"input_ids": (1, 384), "attention_mask": (1, 384)},
         "input_dtype": {"input_ids": "int64", "attention_mask": "int64"},
-        "output_shapes": {"start_logits": (1, 384), "end_logits": (1, 384)}
+        "output_shapes": {"start_logits": (1, 384), "end_logits": (1, 384)},
+        "default_model_path": "models/bert-base-uncased-squad-v1/squad.onnx",
+        "default_dataset_path": "datasets/squad_numpy",
+        "prepare_model_script": "models/prepare_bert_squad.py",
+        "prepare_dataset_script": "datasets/prepare_squad_numpy.py"
     },
     "patchtst-fm-r1": {
         "task": Task.TIME_SERIES_FORECASTING,
-        # 다중 입력: past_values(정규화된 시계열) + past_observed_mask(관측 마스크)
-        # context_length=512, prediction_length=96, num_channels=7 (ETTm1 기본값)
         "input_shapes": {
             "past_values":        (1, 512, 7),
             "past_observed_mask": (1, 512, 7),
@@ -62,8 +82,11 @@ SUPPORTED_PROFILES: Dict[str, Dict[str, Any]] = {
             "past_values":        "float32",
             "past_observed_mask": "bool",
         },
-        # 실제 ONNX 출력 키는 모델 로드 후 자동 탐지
         "output_shapes": {"__auto__": (1, 96, 7)},
+        "default_model_path": "models/ibm-research_patchtst-fm-r1-ONNX/model.onnx",
+        "default_dataset_path": "datasets/etth1/ETTh1.csv",
+        "prepare_model_script": "models/prepare_patchtst.py",
+        "prepare_dataset_script": "datasets/prepare_etth1.py"
     }
 }
 

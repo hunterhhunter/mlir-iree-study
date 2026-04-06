@@ -1,15 +1,15 @@
 """
 Download Kalray/resnet50 from Hugging Face Hub.
 Usage:
-    python models/download_resnet50_kalray.py
-    python models/download_resnet50_kalray.py --format onnx
-    python models/download_resnet50_kalray.py --output /path/to/models
+    python models/prepare_resnet50_kalray.py
+    python models/prepare_resnet50_kalray.py --format onnx
+    python models/prepare_resnet50_kalray.py --output /path/to/models
 """
 import sys
 import os
 
 sys.path.insert(0, os.path.dirname(__file__))
-from download_hf_model import download_model_repository
+from prepare_hf_model import download_model_repository
 
 import argparse
 
