@@ -7,8 +7,8 @@ import numpy as np
 import pytest
 from unittest.mock import MagicMock
 
-from src.dataloader.bert_classification_loader import BertClassificationLoader
-from src.core.model_spec import Model_Spec
+from dataloader.bert_classification_loader import BertClassificationLoader
+from core.model_spec import Model_Spec
 
 @pytest.fixture
 def dummy_bert_spec():

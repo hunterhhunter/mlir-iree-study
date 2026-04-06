@@ -21,10 +21,10 @@ from pathlib import Path
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.insert(0, project_root)
 
-from src.core.model_spec import Model_Spec, Task
-from src.core.compiled_model import CompiledModel
-from src.runtimes import OnnxRuntime
-from src.utils.cuda_preload import preload_cuda_libs, _detect_cuda_version
+from core.model_spec import Model_Spec, Task
+from core.compiled_model import CompiledModel
+from runtimes import OnnxRuntime
+from utils.cuda_preload import preload_cuda_libs, _detect_cuda_version
 
 # ---------------------------------------------------------------------------
 # 테스트 픽스처

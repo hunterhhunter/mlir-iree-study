@@ -1,19 +1,30 @@
 import os
 import numpy as np
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
 from .base import DataLoader
-from src.core.model_spec import Model_Spec
+from core.model_spec import Model_Spec
+from preprocessor.bert_classification_preprocessor import BertClassificationPreprocessor
+
 
 class BertClassificationLoader(DataLoader):
     """
     BERT (SST-2 등) 자연어 텍스트 데이터를 벤치마크 엔진에 공급하는 로더.
     Zero-Latency 원칙에 따라, 전처리 연산을 수행하지 않고 디스크에 오프라인으로 구운
     Numpy 배열(Memory-mapped)을 O(1) 슬라이싱하여 반환.
+
+    preprocessor 인자가 제공되면, numpy 파일이 없을 때 자동으로 데이터셋 전체를
+    토큰화하여 dataset_path에 저장합니다.
     """
     def __init__(self, model_spec: Model_Spec, dataset_path: str, **kwargs):
         self.model_spec = model_spec
         self.dataset_path = dataset_path
         self.current_idx = 0
+
+        # preprocessor가 제공되면 numpy 파일 없을 때 자동 생성
+        preprocessor: Optional[BertClassificationPreprocessor] = kwargs.get("preprocessor", None)
+        if preprocessor is not None:
+            csv_file = kwargs.get("csv_file", None)
+            preprocessor.ensure_preprocessed(dataset_path, csv_file=csv_file)
 
         id_path = os.path.join(dataset_path, "input_ids.npy")
         mask_path = os.path.join(dataset_path, "attention_mask.npy")
@@ -21,7 +32,11 @@ class BertClassificationLoader(DataLoader):
 
         for path in [id_path, mask_path, label_path]:
             if not os.path.exists(path):
-                raise FileNotFoundError(f"[Error] 필수 배열 파일 누락: {path}. prepare_text_numpy.py를 먼저 실행하세요.")
+                raise FileNotFoundError(
+                    f"[Error] 필수 배열 파일 누락: {path}.\n"
+                    "  BertClassificationPreprocessor를 preprocessor= 인자로 전달하거나\n"
+                    "  datasets/prepare_text_numpy.py를 먼저 실행하세요."
+                )
 
         # O(1) 로딩 (mmap_mode='r'):
         # 디스크의 거대한 Numpy 배열을 실제 RAM에 올리지 않고, C언어 포인터처럼 가상 주소 체계로 연결.

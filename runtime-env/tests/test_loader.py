@@ -7,8 +7,8 @@ from PIL import Image
 # 환경 경로 추가
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from src.core.model_spec import Model_Spec, Task
-from src.dataloader.image_classification_loader import ImageClassificationLoader
+from core.model_spec import Model_Spec, Task
+from dataloader.image_classification_loader import ImageClassificationLoader
 
 def setup_dummy_data() -> str:
     """

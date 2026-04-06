@@ -1,7 +1,7 @@
 import pytest
 import numpy as np
-from src.evaluators.bert_qa_evaluator import BertQAEvaluator
-from src.core.inference_result import InferenceResult
+from evaluators.bert_qa_evaluator import BertQAEvaluator
+from core.inference_result import InferenceResult
 
 class TestBertQAEvaluator:
     @pytest.fixture

@@ -6,8 +6,8 @@ import sys
 # src 경로 추가 (런타임 임포트용)
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src")))
 
-from src.runtimes.iree_rt import IREERuntime
-from src.dataloader.base import DataLoader
+from runtimes.iree_rt import IREERuntime
+from dataloader.base import DataLoader
 
 class TestIREERuntime(unittest.TestCase):
     @classmethod

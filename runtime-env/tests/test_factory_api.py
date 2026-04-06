@@ -4,9 +4,9 @@ import os
 # 프로젝트 최상단 경로 추가
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from src.core.model_spec import Model_Spec, Task
+from core.model_spec import Model_Spec, Task
 # 외부(Evaluator) 입장에선 패키지(__init__.py)로부터만 깔끔하게 임포트합니다.
-from src.dataloader import create_dataloader, ImageClassificationLoader
+from dataloader import create_dataloader, ImageClassificationLoader
 
 def test_create_image_loader():
     print("[1] Testing Factory API with Image Classification Task...")

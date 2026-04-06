@@ -8,12 +8,12 @@ from pathlib import Path
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.append(project_root)
 
-from src.core.model_spec import Model_Spec, Task
-from src.core.compiled_model import CompiledModel
-from src.core.benchmarkrunner import BenchmarkRunner
-from src.dataloader import ImageClassificationLoader
-from src.runtimes import OnnxRuntime
-from src.evaluators import ImageClassificationEvaluator
+from core.model_spec import Model_Spec, Task
+from core.compiled_model import CompiledModel
+from core.benchmarkrunner import BenchmarkRunner
+from dataloader import ImageClassificationLoader
+from runtimes import OnnxRuntime
+from evaluators import ImageClassificationEvaluator
 
 def get_onnx_io_names(onnx_path):
     """ONNX 모델의 첫 번째 입력과 출력의 이름을 자동으로 추출합니다."""

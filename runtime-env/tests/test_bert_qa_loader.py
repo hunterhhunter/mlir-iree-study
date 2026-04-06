@@ -4,8 +4,8 @@ import numpy as np
 import pytest
 from unittest.mock import Mock
 
-from src.dataloader.bert_qa_loader import BertQALoader
-from src.core.model_spec import Model_Spec, Task
+from dataloader.bert_qa_loader import BertQALoader
+from core.model_spec import Model_Spec, Task
 
 @pytest.fixture
 def dummy_squad_data():

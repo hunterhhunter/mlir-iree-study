@@ -17,10 +17,10 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import numpy as np
 import pytest
 
-from src.core.inference_result import InferenceResult
-from src.core.model_spec import Model_Spec, Task
-from src.evaluators import create_evaluator
-from src.evaluators.time_series_forecasting_evaluator import TimeSeriesForecastingEvaluator
+from core.inference_result import InferenceResult
+from core.model_spec import Model_Spec, Task
+from evaluators import create_evaluator
+from evaluators.time_series_forecasting_evaluator import TimeSeriesForecastingEvaluator
 
 
 # ------------------------------------------------------------------

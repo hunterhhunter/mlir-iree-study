@@ -2,8 +2,8 @@ import numpy as np
 from typing import Dict, Any, List
 
 from .base import Evaluator
-from src.core.inference_result import InferenceResult
-from src.core.model_spec import Model_Spec, Task
+from core.inference_result import InferenceResult
+from core.model_spec import Model_Spec, Task
 
 class BertClassificationEvaluator(Evaluator):
     """

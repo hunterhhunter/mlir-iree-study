@@ -7,9 +7,9 @@ from pathlib import Path
 # 프로젝트 최상단 경로 추가
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from src.core.model_spec import Model_Spec, Task
-from src.compilers import get_compiler, Compiler
-from src.compilers.iree_compiler import IREECompiler
+from core.model_spec import Model_Spec, Task
+from compilers import get_compiler, Compiler
+from compilers.iree_compiler import IREECompiler
 
 class TestIREECompilerIntegration(unittest.TestCase):
     @classmethod

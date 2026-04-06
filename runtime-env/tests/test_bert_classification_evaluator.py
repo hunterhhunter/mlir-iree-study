@@ -7,10 +7,10 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 import numpy as np
 import pytest
 
-from src.core.inference_result import InferenceResult
+from core.inference_result import InferenceResult
 
 # TDD RED 단계이므로, 해당 로드를 실패하거나, 인스턴스화 시 TypeError가 예상됨 
-from src.evaluators.bert_classification_evaluator import BertClassificationEvaluator
+from evaluators.bert_classification_evaluator import BertClassificationEvaluator
 
 
 def test_bert_evaluator_valid_accuracy():

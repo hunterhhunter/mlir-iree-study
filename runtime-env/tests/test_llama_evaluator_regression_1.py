@@ -18,8 +18,8 @@ import pytest
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from src.core.inference_result import InferenceResult
-from src.evaluators.llama_evaluator import LlamaEvaluator
+from core.inference_result import InferenceResult
+from evaluators.llama_evaluator import LlamaEvaluator
 
 
 def _make_evaluator():

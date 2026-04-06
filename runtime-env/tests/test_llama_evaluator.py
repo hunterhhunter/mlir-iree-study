@@ -20,10 +20,10 @@ import pytest
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from src.core.inference_result import InferenceResult
-from src.core.model_spec import Model_Spec, Task
-from src.dataloader.llama_loader import LlamaLoader
-from src.evaluators import LlamaEvaluator, create_evaluator
+from core.inference_result import InferenceResult
+from core.model_spec import Model_Spec, Task
+from dataloader.llama_loader import LlamaLoader
+from evaluators import LlamaEvaluator, create_evaluator
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 공통 픽스처
