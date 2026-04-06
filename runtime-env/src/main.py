@@ -1,6 +1,7 @@
 import os
 import sys
 import argparse
+import subprocess
 from pathlib import Path
 
 # 프로젝트 루트 경로 추가 (sys.path)
@@ -19,6 +20,25 @@ from evaluators import create_evaluator
 from runtimes import create_runtime
 # from src.runtimes.iree_rt import IREERuntime  # 향후 IREE 백엔드 추가 시 주석 해제
 
+def run_auto_prepare(profile: dict, args: argparse.Namespace):
+    """
+    Zero-Config 벤치마크를 위해 누락된 리소스를 감지하고 백그라운드 준비 스크립트를 자동 실행합니다.
+    """
+    model_path = args.model_path if args.backend == "vllm" else args.onnx
+    dataset_path = args.dataset
+
+    if "prepare_model_script" in profile and profile["prepare_model_script"]:
+        if not model_path or not os.path.exists(model_path):
+            script = profile["prepare_model_script"]
+            print(f"[*] 모델 리소스 누락 감지. 자동 준비 스크립트 실행: {script}")
+            subprocess.run([sys.executable, script], check=True)
+            
+    if "prepare_dataset_script" in profile and profile["prepare_dataset_script"]:
+        if not dataset_path or not os.path.exists(dataset_path):
+            script = profile["prepare_dataset_script"]
+            print(f"[*] 데이터셋 리소스 누락 감지. 자동 준비 스크립트 실행: {script}")
+            subprocess.run([sys.executable, script], check=True)
+
 
 def main():
     parser = argparse.ArgumentParser(description="Unified BenchmarkRunner CLI Orchestrator")
@@ -26,7 +46,7 @@ def main():
     parser.add_argument("--onnx", type=str, default=None, help="ONNX 파일의 절대 또는 상대 경로 (onnxruntime 백엔드 필수)")
     parser.add_argument("--model-path", type=str, default=None, help="HuggingFace 모델 디렉토리 경로 (vLLM 백엔드 필수)")
     parser.add_argument("--tokenizer-path", type=str, default=None, help="HuggingFace 토크나이저 디렉토리 경로 (NLP 모델 필수)")
-    parser.add_argument("--dataset", type=str, required=True, help="평가용 데이터셋 최상위 디렉토리 또는 CSV 파일 경로")
+    parser.add_argument("--dataset", type=str, default=None, help="평가용 데이터셋 최상위 디렉토리 또는 CSV 파일 경로")
     parser.add_argument("--image-dir", type=str, default="", help="(옵션) 데이터셋 내 이미지 하위 폴더 경로")
     parser.add_argument("--label-dir", type=str, default="", help="(옵션) 데이터셋 내 라벨 하위 폴더 경로")
     parser.add_argument("--layout", type=str, default="NCHW", choices=["NCHW", "NHWC"], help="모델 텐서 레이아웃 (기본: NCHW)")
@@ -40,6 +60,33 @@ def main():
     parser.add_argument("--debug", action="store_true", help="샘플별 예측/정답/점수 로그 출력 (기본: 비활성)")
     
     args = parser.parse_args()
+    
+    # [설계 개선] CLI 인자(--task)에 의존하지 않고, 레지스트리(SUPPORTED_PROFILES)에서 태스크를 자동 추론 (DRY 원칙)
+    from core.model_profiles import SUPPORTED_PROFILES
+    profile = SUPPORTED_PROFILES.get(args.model)
+    if not profile:
+        print(f"[Error] '{args.model}' 프로필을 찾을 수 없습니다. model_profiles.py에 등록되었는지 확인하세요.")
+        sys.exit(1)
+        
+        
+    # 누락된 인자(default) 주입 (Zero-Config)
+    if args.onnx is None and "default_model_path" in profile:
+        args.onnx = profile["default_model_path"]
+    if args.model_path is None and "default_model_path" in profile:
+        args.model_path = profile["default_model_path"]
+    if args.dataset is None and "default_dataset_path" in profile:
+        args.dataset = profile["default_dataset_path"]
+        
+    # 토크나이저 경로 자동 추론 (NLP 태스크용)
+    if args.tokenizer_path is None:
+        if args.backend == "vllm" and args.model_path:
+            args.tokenizer_path = args.model_path
+        elif args.onnx:
+            # ONNX 파일 경로면 부모 디렉토리를 토크나이저 경로로 간주
+            args.tokenizer_path = os.path.dirname(args.onnx) if args.onnx.endswith(".onnx") else args.onnx
+            
+    # 리소스 누락 시 백그라운드 준비 스크립트 실행 (Auto-Prepare)
+    run_auto_prepare(profile, args)
     
     # 백엔드별 필수 인자 검증
     if args.backend == "vllm":
@@ -62,13 +109,6 @@ def main():
             else:
                 print(f"[Error] 디렉토리 {args.onnx} 에서 model.onnx를 찾을 수 없습니다.")
                 sys.exit(1)
-        
-    # [설계 개선] CLI 인자(--task)에 의존하지 않고, 레지스트리(SUPPORTED_PROFILES)에서 태스크를 자동 추론 (DRY 원칙)
-    from core.model_profiles import SUPPORTED_PROFILES
-    profile = SUPPORTED_PROFILES.get(args.model)
-    if not profile:
-        print(f"[Error] '{args.model}' 프로필을 찾을 수 없습니다. model_profiles.py에 등록되었는지 확인하세요.")
-        sys.exit(1)
     
     task_enum = profile["task"]
     
