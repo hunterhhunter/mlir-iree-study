@@ -29,7 +29,7 @@ def main():
     parser.add_argument("--split", type=str, default="validation", help="벤치마크 평가용 스플릿 (기본: validation)")
     
     # 출력 경로 기본값
-    parser.add_argument("--output-dir", "-o", type=str, default=os.path.join(os.path.dirname(__file__), "../datasets/baked_numpy/squad_val"), help="npy 파일 저장 절대 경로")
+    parser.add_argument("--output-dir", "-o", type=str, default=os.path.join(os.path.dirname(__file__), "../datasets/squad_numpy"), help="npy 파일 저장 절대 경로")
     args = parser.parse_args()
 
     # 1. 원본 데이터 로드 (validation 셋만 부름 - 벤치마크 목적)
