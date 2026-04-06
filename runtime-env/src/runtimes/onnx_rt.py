@@ -113,6 +113,12 @@ class OnnxRuntime(Runtime):
                     k: v[:, :real_len] if v.ndim == 2 else v
                     for k, v in inputs.items()
                 }
+            # 모델이 position_ids를 요구하는 경우 warmup_inputs에 자동 생성하여 주입
+            if "position_ids" in self.input_names and "position_ids" not in warmup_inputs:
+                attn = warmup_inputs.get("attention_mask", inputs["attention_mask"])
+                warmup_inputs["position_ids"] = np.maximum(
+                    np.cumsum(attn, axis=-1) - 1, 0
+                ).astype(np.int64)
         for _ in range(num_runs):
             self.run(warmup_inputs)
 

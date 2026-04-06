@@ -57,7 +57,7 @@ SUPPORTED_PROFILES: Dict[str, Dict[str, Any]] = {
         "input_shapes": {"input_ids": (1, 4096), "attention_mask": (1, 4096)},
         "input_dtype": {"input_ids": "int64", "attention_mask": "int64"},
         "output_shapes": {"logits": (1, 4096, 128256)},
-        "default_model_path": "models/meta-llama_Llama-3.2-3B",
+        "default_model_path": "models/meta-llama_Llama-3.2-3B-ONNX",
         "default_dataset_path": "datasets/squad2/val.json",
         "prepare_model_script": "models/prepare_llama_3_2_3b.py",
         "prepare_dataset_script": "datasets/prepare_squad2.py"
@@ -120,13 +120,19 @@ def create_model_spec(model_name: str, onnx_path: str, task: Task = Task.IMAGE_C
     if "__auto__" in spec_kwargs["input_shapes"]:
         input_n, output_n = _parse_onnx_io_names(onnx_path)
         print(f"[Factory] Detected ONNX I/O dynamically -> Input: '{input_n}', Output: '{output_n}'")
-        
+
         spec_kwargs["input_shapes"] = {input_n: spec_kwargs["input_shapes"].pop("__auto__")}
         spec_kwargs["input_dtype"] = {input_n: spec_kwargs["input_dtype"].pop("__auto__", "float32")}
-        
+
         if "__auto__" in spec_kwargs["output_shapes"]:
             spec_kwargs["output_shapes"] = {output_n: spec_kwargs["output_shapes"].pop("__auto__")}
-            
+
+    # 입력은 고정이고 출력만 __auto__인 경우 (예: patchtst-fm-r1) — 출력 이름만 스니핑
+    elif "__auto__" in spec_kwargs["output_shapes"]:
+        _, output_n = _parse_onnx_io_names(onnx_path)
+        print(f"[Factory] Detected ONNX Output dynamically -> Output: '{output_n}'")
+        spec_kwargs["output_shapes"] = {output_n: spec_kwargs["output_shapes"].pop("__auto__")}
+
     return Model_Spec(
         name=model_name,
         task=spec_kwargs["task"],

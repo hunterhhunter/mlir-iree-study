@@ -111,7 +111,14 @@ def main():
                 sys.exit(1)
     
     task_enum = profile["task"]
-    
+
+    # 백엔드-태스크 호환성 검증: vllm은 NLP_GENERATION 전용
+    if args.backend == "vllm" and task_enum != Task.NLP_GENERATION:
+        print(f"[Error] vllm 백엔드는 NLP_GENERATION 태스크만 지원합니다. "
+              f"모델 '{args.model}'의 태스크는 {task_enum.name}입니다. "
+              f"onnxruntime 백엔드를 사용하세요: --backend onnxruntime")
+        sys.exit(1)
+
     print("\n" + "="*60)
     print(f" BenchmarkRunner CLI ")
     print(f"   Model: {args.model} | Task: {task_enum.name} | Layout: {args.layout}")
