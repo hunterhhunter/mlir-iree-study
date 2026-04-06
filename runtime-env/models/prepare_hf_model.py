@@ -33,6 +33,8 @@ def download_model_repository(repo_id: str, file_format: str = None, output_root
 
     except Exception as e:
         print(f"\n[!] Critical Error during snapshot download: {e}")
+        import sys
+        sys.exit(1)
 
 def main():
     parser = argparse.ArgumentParser(description="Hugging Face Full Model Downloader")
