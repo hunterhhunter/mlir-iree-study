@@ -28,8 +28,8 @@ from typing import Any, Dict, List, Optional
 import numpy as np
 
 from .base import DataLoader
-from .preprocess_strategies import TimeSeriesPreprocessStrategy
 from core.model_spec import Model_Spec
+from preprocessor.ettm_preprocessor import ETTmPreprocessor
 
 
 # ETTm1 데이터 컬럼 (date 제외)
@@ -94,7 +94,7 @@ class ETTmLoader(DataLoader):
             math.floor((usable - self.context_length - self.prediction_length) / self.stride) + 1,
         )
 
-        self._preprocess = TimeSeriesPreprocessStrategy()
+        self._preprocessor = ETTmPreprocessor(normalize=self.normalize)
         self._current_idx = 0
 
     # ------------------------------------------------------------------
@@ -143,8 +143,8 @@ class ETTmLoader(DataLoader):
         }
 
     def preprocess(self, raw_input: np.ndarray) -> np.ndarray:
-        """(T, C) 원본 윈도우 → RevIN 정규화된 past_values (1, T, C)."""
-        result = self._preprocess(raw_input)
+        """(T, C) 원본 윈도우 → RevIN 정규화된 past_values."""
+        result = self._preprocessor.preprocess(raw_input)
         return result["past_values"]
 
     # ------------------------------------------------------------------
@@ -188,91 +188,31 @@ class ETTmLoader(DataLoader):
         raise ValueError(f"ETTmLoader: split='{self.split}' 은 'train', 'val', 'test' 중 하나여야 합니다.")
 
     def _get_window(self, window_idx: int) -> Dict[str, Any]:
-        """캐시 또는 계산을 통해 window_idx번째 샘플을 반환합니다."""
-        cached = self._load_from_cache(window_idx)
-        if cached is not None:
-            return cached
-
+        """ETTmPreprocessor에 캐시 체크와 전처리를 위임하여 window_idx번째 샘플을 반환합니다."""
         abs_start = self._split_start + window_idx * self.stride
-        past_raw   = self._data[abs_start : abs_start + self.context_length]               # (T, C)
+        past_raw   = self._data[abs_start : abs_start + self.context_length]
         future_raw = self._data[abs_start + self.context_length :
-                                abs_start + self.context_length + self.prediction_length]  # (H, C)
+                                abs_start + self.context_length + self.prediction_length]
 
-        if self.normalize:
-            preprocessed = self._preprocess(past_raw)
-            past_values        = preprocessed["past_values"]
-            past_observed_mask = preprocessed["past_observed_mask"]
-            norm_stats         = preprocessed["norm_stats"]
-        else:
-            # normalize=False: raw 데이터 그대로 반환. 모델 내부 scaling(예: scaling="std") 사용 시.
-            # norm_stats를 항등 변환(mean=0, std=1)으로 설정해 평가기 역정규화가 no-op이 되게 함.
-            C = past_raw.shape[1]
-            past_values        = past_raw.astype(np.float32)
-            past_observed_mask = np.ones_like(past_values, dtype=bool)
-            norm_stats         = {
-                "mean": np.zeros(C, dtype=np.float32),
-                "std":  np.ones(C,  dtype=np.float32),
-            }
+        cache_path = self._preprocessor.get_cache_path(
+            self.cache_dir,
+            self.split,
+            self.context_length,
+            self.prediction_length,
+            self.stride,
+            window_idx,
+        )
+        preprocessed = self._preprocessor.load_or_preprocess_window(cache_path, past_raw)
 
-        sample = {
+        return {
             "input": {
-                "past_values":        past_values,
-                "past_observed_mask": past_observed_mask,
+                "past_values":        preprocessed["past_values"],
+                "past_observed_mask": preprocessed["past_observed_mask"],
             },
             "label": {
                 "future_values": future_raw.astype(np.float32),
-                "norm_stats":    norm_stats,
+                "norm_stats":    preprocessed["norm_stats"],
             },
             "window_idx": window_idx,
         }
 
-        self._save_to_cache(window_idx, sample)
-        return sample
-
-    # ------------------------------------------------------------------
-    # 캐시 (NPZ)
-    # ------------------------------------------------------------------
-
-    def _cache_path(self, window_idx: int) -> Optional[str]:
-        if self.cache_dir is None:
-            return None
-        subdir = os.path.join(
-            self.cache_dir,
-            f"{self.split}_{self.context_length}_{self.prediction_length}_{self.stride}",
-        )
-        return os.path.join(subdir, f"{window_idx:06d}.npz")
-
-    def _load_from_cache(self, window_idx: int) -> Optional[Dict[str, Any]]:
-        path = self._cache_path(window_idx)
-        if path is None or not os.path.exists(path):
-            return None
-        npz = np.load(path, allow_pickle=False)
-        return {
-            "input": {
-                "past_values":        npz["past_values"],
-                "past_observed_mask": npz["past_observed_mask"],
-            },
-            "label": {
-                "future_values": npz["future_values"],
-                "norm_stats": {
-                    "mean": npz["norm_mean"],
-                    "std":  npz["norm_std"],
-                },
-            },
-            "window_idx": int(npz["window_idx"]),
-        }
-
-    def _save_to_cache(self, window_idx: int, sample: Dict[str, Any]) -> None:
-        path = self._cache_path(window_idx)
-        if path is None:
-            return
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        np.savez(
-            path,
-            past_values        = sample["input"]["past_values"],
-            past_observed_mask = sample["input"]["past_observed_mask"],
-            future_values      = sample["label"]["future_values"],
-            norm_mean          = sample["label"]["norm_stats"]["mean"],
-            norm_std           = sample["label"]["norm_stats"]["std"],
-            window_idx         = np.array(window_idx),
-        )

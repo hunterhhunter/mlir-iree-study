@@ -13,8 +13,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.core.model_spec import Model_Spec, Task
-from src.dataloader import ETTmLoader, create_dataloader
+from core.model_spec import Model_Spec, Task
+from dataloader import ETTmLoader, create_dataloader
 
 
 # ── 공통 픽스처 ────────────────────────────────────────────────────────────────

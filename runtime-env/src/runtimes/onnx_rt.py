@@ -79,8 +79,11 @@ class OnnxRuntime(Runtime):
         if self.session is None:
             raise RuntimeError("ONNX Runtime session is not loaded. Call load() first.")
             
-        # 입력된 텐서들 중 모델이 실제로 필요로 하는 이름표만 매핑해서 넣음
-        ort_inputs = {name: inputs[name] for name in self.input_names if name in inputs}
+        # 모델이 필요로 하는 입력이 모두 제공됐는지 검증
+        missing = [name for name in self.input_names if name not in inputs]
+        if missing:
+            raise ValueError(f"Missing required model inputs: {missing}. Provided keys: {list(inputs.keys())}")
+        ort_inputs = {name: inputs[name] for name in self.input_names}
         
         # 실제 하드웨어 커널에 연산 지시
         results = self.session.run(self.output_names, ort_inputs)

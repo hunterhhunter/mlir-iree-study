@@ -33,12 +33,12 @@ from pathlib import Path
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, project_root)
 
-from src.core.model_spec import Model_Spec, Task
-from src.core.compiled_model import CompiledModel
-from src.core.benchmarkrunner import BenchmarkRunner
-from src.dataloader import LlamaLoader
-from src.runtimes import VllmRuntime
-from src.evaluators import LlamaEvaluator
+from core.model_spec import Model_Spec, Task
+from core.compiled_model import CompiledModel
+from core.benchmarkrunner import BenchmarkRunner
+from dataloader import LlamaLoader
+from runtimes import VllmRuntime
+from evaluators import LlamaEvaluator
 
 
 # ------------------------------------------------------------------

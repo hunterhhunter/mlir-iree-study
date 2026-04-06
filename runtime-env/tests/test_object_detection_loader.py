@@ -5,8 +5,8 @@ from PIL import Image
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from src.core.model_spec import Model_Spec, Task
-from src.dataloader.object_detection_loader import ObjectDetectionLoader
+from core.model_spec import Model_Spec, Task
+from dataloader.object_detection_loader import ObjectDetectionLoader
 
 import sys
 import os
@@ -16,8 +16,8 @@ import pytest
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from src.core.model_spec import Model_Spec, Task
-from src.dataloader.object_detection_loader import ObjectDetectionLoader
+from core.model_spec import Model_Spec, Task
+from dataloader.object_detection_loader import ObjectDetectionLoader
 
 @pytest.fixture
 def dummy_coco_dir(tmp_path):

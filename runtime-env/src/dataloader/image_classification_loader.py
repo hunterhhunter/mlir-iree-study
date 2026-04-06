@@ -3,24 +3,19 @@ Image Classification DataLoader
 
 - 로컬 데이터 폴더에서 이미지를 읽고 전처리하는 순수 공급 프레임워크입니다.
 - `Model_Spec` 객체를 활용하여 모델 입력 형태(shape)를 추출합니다.
-- 전처리 로직은 PreprocessStrategy 객체로 완전히 분리됩니다.
+- 전처리 로직은 ImagePreprocessor 객체로 완전히 분리됩니다.
 - MLPerf의 .npy 디스크 캐싱 패턴을 채택하여 반복 실행 시 전처리 비용을 제거합니다.
 """
 
 import os
 import json
-from pathlib import Path
-from typing import Dict, List, Any, Optional, Tuple
+from typing import Dict, List, Any, Optional
 import numpy as np
-from PIL import Image
 
 from .base import DataLoader
-from .preprocess_strategies import (
-    PreprocessStrategy,
-    MLPerfResNet50Preprocess,
-    DirectResizePreprocess,
-)
+from .preprocess_strategies import PreprocessStrategy
 from core.model_spec import Model_Spec
+from preprocessor.image_preprocessor import ImagePreprocessor
 
 # 범용 ImageNet 정규화 상수 (기본 폴백 용도)
 IMAGENET_MEAN = (0.485, 0.456, 0.406)
@@ -96,10 +91,19 @@ class ImageClassificationLoader(DataLoader):
 
         self.layout = kwargs.get("layout", "NCHW").upper()
 
-        # 5. 전처리 전략 주입 (기본값: MLPerfResNet50Preprocess)
-        self.preprocess_strategy: PreprocessStrategy = kwargs.get(
-            "preprocess_strategy", MLPerfResNet50Preprocess()
-        )
+        # 5. 전처리기 초기화 (ImagePreprocessor)
+        #    외부에서 preprocess_strategy를 주입하면 해당 전략을 사용하고,
+        #    preprocessor를 직접 주입하면 그것을 우선 사용합니다.
+        if "preprocessor" in kwargs:
+            self.preprocessor: ImagePreprocessor = kwargs["preprocessor"]
+        else:
+            strategy: Optional[PreprocessStrategy] = kwargs.get("preprocess_strategy", None)
+            self.preprocessor = ImagePreprocessor(
+                target_hw=self.target_hw,
+                mean=self.mean,
+                std=self.std,
+                strategy=strategy,
+            )
 
         self.cache_dir: Optional[str] = kwargs.get("cache_dir", None)
         if self.cache_dir:
@@ -107,11 +111,11 @@ class ImageClassificationLoader(DataLoader):
             print(f"[DataLoader] Preprocessing cache enabled: {self.cache_dir}")
 
     # ------------------------------------------------------------------
-    # Private helpers
+    # 내부 헬퍼
     # ------------------------------------------------------------------
-    
+
     def _try_load_preprocessor_config(self):
-        """모델 원본 서명(Spec) 경로 인근의 preprocessor_config.json을 탐색하여 mean/std를 반환."""
+        """모델 경로 인근의 preprocessor_config.json에서 mean/std를 탐색합니다."""
         if "onnx" not in self.model_spec.model_paths:
             return None, None
         onnx_path = self.model_spec.model_paths["onnx"]
@@ -127,33 +131,10 @@ class ImageClassificationLoader(DataLoader):
             print(f"[DataLoader] Failed to parse preprocessor_config.json: {e}")
             return None, None
 
-    def _get_cache_path(self, img_filename: str) -> Optional[str]:
-        """이미지 파일명 기반으로 .npy 캐시 파일 경로를 반환. 캐시 비활성 시 None."""
-        if not self.cache_dir:
-            return None
-        stem = Path(img_filename).stem
-        return os.path.join(self.cache_dir, stem + ".npy")
-
     def _load_or_preprocess(self, img_path: str, img_filename: str) -> np.ndarray:
-        """
-        .npy 캐시가 있으면 로드, 없으면 전처리 전략을 실행 후 캐시에 저장합니다.
-        (MLPerf Imagenet.process() 패턴 채택)
-        """
-        cache_path = self._get_cache_path(img_filename)
-
-        # 캐시 히트
-        if cache_path and os.path.exists(cache_path):
-            return np.load(cache_path)
-
-        # 전처리 실행
-        img    = Image.open(img_path)
-        tensor = self.preprocess_strategy(img, self.target_hw, self.mean, self.std)
-
-        # 캐시 저장
-        if cache_path:
-            np.save(cache_path, tensor)
-
-        return tensor
+        """ImagePreprocessor에 캐시 체크와 전처리를 위임합니다."""
+        cache_path = self.preprocessor.get_cache_path(self.cache_dir, img_filename)
+        return self.preprocessor.load_or_preprocess(cache_path, img_path)
 
     # ------------------------------------------------------------------
     # DataLoader ABC 구현
@@ -203,19 +184,15 @@ class ImageClassificationLoader(DataLoader):
 
     def get_metadata(self) -> Dict[str, Any]:
         return {
-            "total_samples":        self.total_samples,
-            "dataset_path":         self.base_path,
-            "target_hw":            self.target_hw,
-            "mean":                 self.mean.tolist(),
-            "std":                  self.std.tolist(),
-            "preprocess_strategy":  type(self.preprocess_strategy).__name__,
-            "cache_dir":            self.cache_dir,
+            "total_samples":  self.total_samples,
+            "dataset_path":   self.base_path,
+            "target_hw":      self.target_hw,
+            "mean":           self.mean.tolist(),
+            "std":            self.std.tolist(),
+            "preprocessor":   type(self.preprocessor).__name__,
+            "cache_dir":      self.cache_dir,
         }
 
     def preprocess(self, raw_input: Any) -> np.ndarray:
-        """
-        단일 raw 입력을 현재 전략으로 전처리합니다.
-        파일 경로(str) 또는 PIL.Image 객체를 받습니다.
-        """
-        img = Image.open(raw_input) if isinstance(raw_input, str) else raw_input
-        return self.preprocess_strategy(img, self.target_hw, self.mean, self.std)
+        """단일 raw 입력을 전처리합니다. 파일 경로(str) 또는 PIL.Image 객체를 받습니다."""
+        return self.preprocessor.preprocess(raw_input)

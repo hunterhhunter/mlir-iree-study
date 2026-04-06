@@ -1,22 +1,33 @@
 import os
 import numpy as np
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 from .base import DataLoader
-from src.core.model_spec import Model_Spec
+from core.model_spec import Model_Spec
+from preprocessor.bert_qa_preprocessor import BertQAPreprocessor
+
 
 class BertQALoader(DataLoader):
     """
     BERT SQuAD 질의응답(Question Answering) 자연어 텍스트 데이터를 벤치마크 엔진에 공급하는 로더.
     Zero-Latency 원칙에 따라, 전처리 연산을 수행하지 않고 디스크에 오프라인으로 베이킹(Baked)된
     Numpy 배열(Memory-mapped)을 O(1) 시간복잡도로 슬라이싱하여 반환합니다.
+
+    preprocessor 인자가 제공되면, numpy 파일이 없을 때 자동으로 데이터셋 전체를
+    토큰화하여 dataset_path에 저장합니다.
     """
     def __init__(self, model_spec: Model_Spec, dataset_path: str, **kwargs):
         self.model_spec = model_spec
         self.dataset_path = dataset_path
         self.current_idx = 0
 
-        # SQuAD 오프라인 베이킹(prepare_squad_numpy.py)으로 구워진 4개의 파일 타겟팅
+        # preprocessor가 제공되면 numpy 파일 없을 때 자동 생성
+        preprocessor: Optional[BertQAPreprocessor] = kwargs.get("preprocessor", None)
+        if preprocessor is not None:
+            squad_json = kwargs.get("squad_json", None)
+            preprocessor.ensure_preprocessed(dataset_path, squad_json=squad_json)
+
+        # SQuAD 오프라인 베이킹으로 구워진 4개의 파일 타겟팅
         self._require_files = {
             "id": os.path.join(dataset_path, "input_ids.npy"),
             "mask": os.path.join(dataset_path, "attention_mask.npy"),
@@ -26,7 +37,11 @@ class BertQALoader(DataLoader):
 
         for name, path in self._require_files.items():
             if not os.path.exists(path):
-                raise FileNotFoundError(f"[Error] 필수 SQuAD 배열 파일 누락: {path}")
+                raise FileNotFoundError(
+                    f"[Error] 필수 SQuAD 배열 파일 누락: {path}.\n"
+                    "  BertQAPreprocessor를 preprocessor= 인자로 전달하거나\n"
+                    "  datasets/prepare_squad_numpy.py를 먼저 실행하세요."
+                )
 
         # O(1) 로딩 (mmap_mode='r'):
         # 디스크의 거대한 Numpy 배열을 실제 RAM에 상주시키지 않고 가상 C포인터 체계로 캐싱.

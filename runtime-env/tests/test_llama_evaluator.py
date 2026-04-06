@@ -20,10 +20,10 @@ import pytest
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from src.core.inference_result import InferenceResult
-from src.core.model_spec import Model_Spec, Task
-from src.dataloader.llama_loader import LlamaLoader
-from src.evaluators import LlamaEvaluator, create_evaluator
+from core.inference_result import InferenceResult
+from core.model_spec import Model_Spec, Task
+from dataloader.llama_loader import LlamaLoader
+from evaluators import LlamaEvaluator, create_evaluator
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 공통 픽스처
@@ -106,7 +106,7 @@ def _make_evaluator(decode_fn) -> LlamaEvaluator:
     """
     mock_tok = MagicMock()
     mock_tok.decode.side_effect = lambda ids, **kw: decode_fn(ids)
-    with patch("src.evaluators.llama_evaluator.AutoTokenizer") as mock_cls:
+    with patch("evaluators.llama_evaluator.AutoTokenizer") as mock_cls:
         mock_cls.from_pretrained.return_value = mock_tok
         evaluator = LlamaEvaluator(tokenizer_path="mock")
     return evaluator
@@ -375,7 +375,7 @@ def test_factory_routes_nlp_generation():
         input_dtype={"input_ids": "int64"},
         output_shapes={"logits": (1, MAX_LEN, VOCAB_SIZE)},
     )
-    with patch("src.evaluators.llama_evaluator.AutoTokenizer") as mock_cls:
+    with patch("evaluators.llama_evaluator.AutoTokenizer") as mock_cls:
         mock_cls.from_pretrained.return_value = MagicMock()
         evaluator = create_evaluator(spec, tokenizer_path="mock")
 
@@ -393,7 +393,7 @@ def test_is_applicable():
         input_dtype={"input_ids": "int64"},
         output_shapes={"logits": (1, MAX_LEN, VOCAB_SIZE)},
     )
-    with patch("src.evaluators.llama_evaluator.AutoTokenizer") as mock_cls:
+    with patch("evaluators.llama_evaluator.AutoTokenizer") as mock_cls:
         mock_cls.from_pretrained.return_value = MagicMock()
         evaluator = LlamaEvaluator(tokenizer_path="mock")
 
@@ -403,7 +403,7 @@ def test_is_applicable():
 
 def test_get_metric_names():
     """get_metric_names가 기대하는 지표 이름을 반환하는지 검증."""
-    with patch("src.evaluators.llama_evaluator.AutoTokenizer") as mock_cls:
+    with patch("evaluators.llama_evaluator.AutoTokenizer") as mock_cls:
         mock_cls.from_pretrained.return_value = MagicMock()
         evaluator = LlamaEvaluator(tokenizer_path="mock")
 

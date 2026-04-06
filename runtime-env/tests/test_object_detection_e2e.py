@@ -7,12 +7,12 @@ project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 if project_root not in sys.path:
     sys.path.append(project_root)
 
-from src.core.model_spec import Model_Spec, Task
-from src.core.compiled_model import CompiledModel
-from src.core.benchmarkrunner import BenchmarkRunner
-from src.dataloader import create_dataloader
-from src.runtimes import create_runtime
-from src.evaluators import create_evaluator
+from core.model_spec import Model_Spec, Task
+from core.compiled_model import CompiledModel
+from core.benchmarkrunner import BenchmarkRunner
+from dataloader import create_dataloader
+from runtimes import create_runtime
+from evaluators import create_evaluator
 
 def main():
     print("="*60)
@@ -46,7 +46,7 @@ def main():
     
     # 2. 객체 인스턴스화 (Factory 기반)
     print("\n---------- [2단계: 팩토리(Factory) 기반 컴포넌트 생성] ----------")
-    from src.utils.dataset_resolver import resolve_dataset_paths
+    from utils.dataset_resolver import resolve_dataset_paths
     image_dir, label_path = resolve_dataset_paths(det_spec.task, dataset_path, "", "")
     loader = create_dataloader(model_spec=det_spec, dataset_path=dataset_path, image_dir=image_dir, label_path=label_path)
     print(f"[+] DataLoader 생성 완료 (Loaded {loader.total_samples} samples)")

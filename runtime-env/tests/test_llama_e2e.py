@@ -22,12 +22,12 @@ from pathlib import Path
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, project_root)
 
-from src.core.model_profiles import create_model_spec
-from src.core.compiled_model import CompiledModel
-from src.core.benchmarkrunner import BenchmarkRunner
-from src.dataloader import LlamaLoader
-from src.runtimes import OnnxRuntime
-from src.evaluators import LlamaEvaluator
+from core.model_profiles import create_model_spec
+from core.compiled_model import CompiledModel
+from core.benchmarkrunner import BenchmarkRunner
+from dataloader import LlamaLoader
+from runtimes import OnnxRuntime
+from evaluators import LlamaEvaluator
 
 
 # ------------------------------------------------------------------

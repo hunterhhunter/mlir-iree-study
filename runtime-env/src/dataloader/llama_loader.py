@@ -20,8 +20,8 @@ from typing import Any, Dict, List, Optional
 import numpy as np
 
 from .base import DataLoader
-from .preprocess_strategies import SQuADPreprocessStrategy
 from core.model_spec import Model_Spec
+from preprocessor.llama_preprocessor import LlamaPreprocessor
 
 
 class LlamaLoader(DataLoader):
@@ -59,9 +59,16 @@ class LlamaLoader(DataLoader):
             else:
                 squad_json = os.path.join(self.base_path, "val.json")
 
-        # 2. 전처리 전략 초기화
-        if "preprocess_strategy" in kwargs:
-            self.preprocess_strategy: SQuADPreprocessStrategy = kwargs["preprocess_strategy"]
+        # 2. 전처리기 초기화 (LlamaPreprocessor)
+        if "preprocessor" in kwargs:
+            self.preprocessor: LlamaPreprocessor = kwargs["preprocessor"]
+        elif "preprocess_strategy" in kwargs:
+            # 하위 호환성: preprocess_strategy를 직접 넘기던 기존 코드 지원
+            from preprocessor.llama_preprocessor import LlamaPreprocessor as _LP
+            from dataloader.preprocess_strategies import SQuADPreprocessStrategy
+            strategy = kwargs["preprocess_strategy"]
+            self.preprocessor = _LP.__new__(_LP)
+            self.preprocessor._strategy = strategy
         else:
             tokenizer_path = kwargs.get("tokenizer_path")
             if tokenizer_path is None:
@@ -70,7 +77,7 @@ class LlamaLoader(DataLoader):
                     "예: LlamaLoader(spec, tokenizer_path='models/meta-llama/...')"
                 )
             max_length = kwargs.get("max_length", 4096)
-            self.preprocess_strategy = SQuADPreprocessStrategy(
+            self.preprocessor = LlamaPreprocessor(
                 tokenizer_path=tokenizer_path,
                 max_length=max_length,
             )
@@ -131,39 +138,10 @@ class LlamaLoader(DataLoader):
                         "plausible_answers": qa.get("plausible_answers", []),
                     }
 
-    def _get_cache_path(self, qa_id: str) -> Optional[str]:
-        """qa_id 기반 .npz 캐시 파일 경로. 캐시 비활성 시 None."""
-        if not self.cache_dir:
-            return None
-        # qa_id는 영숫자와 하이픈으로 구성되어 파일명으로 안전하게 사용 가능
-        return os.path.join(self.cache_dir, f"{qa_id}.npz")
-
     def _load_or_tokenize(self, sample: Dict) -> Dict[str, np.ndarray]:
-        """
-        .npz 캐시가 있으면 로드, 없으면 토큰화 후 캐시에 저장합니다.
-        (ImageClassificationLoader._load_or_preprocess 패턴과 동일)
-        """
-        cache_path = self._get_cache_path(sample["qa_id"])
-
-        # 캐시 히트
-        if cache_path and os.path.exists(cache_path):
-            loaded = np.load(cache_path)
-            return {
-                "input_ids":      loaded["input_ids"],
-                "attention_mask": loaded["attention_mask"],
-            }
-
-        # 토큰화 실행
-        tensors = self.preprocess_strategy.tokenize(
-            question=sample["question"],
-            context=sample["context"],
-        )
-
-        # 캐시 저장
-        if cache_path:
-            np.savez(cache_path, **tensors)
-
-        return tensors
+        """LlamaPreprocessor에 캐시 체크와 토큰화를 위임합니다."""
+        cache_path = self.preprocessor.get_cache_path(self.cache_dir, sample["qa_id"])
+        return self.preprocessor.load_or_tokenize(cache_path, sample)
 
     # ------------------------------------------------------------------
     # DataLoader ABC 구현
@@ -244,7 +222,7 @@ class LlamaLoader(DataLoader):
 
     def _build_stop_token_ids(self) -> list:
         """EOS + 줄바꿈 계열 토큰 ID 목록을 반환합니다."""
-        tok = self.preprocess_strategy.tokenizer
+        tok = self.preprocessor.tokenizer
         ids = set()
         if tok.eos_token_id is not None:
             ids.add(tok.eos_token_id)
@@ -257,33 +235,18 @@ class LlamaLoader(DataLoader):
     def get_metadata(self) -> Dict[str, Any]:
         impossible_count = sum(1 for s in self.samples if s["is_impossible"])
         return {
-            "total_samples":       self.total_samples,
-            "answerable_samples":  self.total_samples - impossible_count,
-            "impossible_samples":  impossible_count,
-            "dataset_path":        self.base_path,
-            "max_length":          self.preprocess_strategy.max_length,
-            "tokenizer_path":      self.preprocess_strategy.tokenizer.name_or_path,
-            "eos_token_id":        self.preprocess_strategy.tokenizer.eos_token_id,
-            # 줄바꿈/이중줄바꿈 토큰: "Answer:" 이후 한 줄 완성을 유도하는 프롬프트와 쌍을 이룸
-            "stop_token_ids":      self._build_stop_token_ids(),
-            "cache_dir":           self.cache_dir,
-            "preprocess_strategy": type(self.preprocess_strategy).__name__,
+            "total_samples":      self.total_samples,
+            "answerable_samples": self.total_samples - impossible_count,
+            "impossible_samples": impossible_count,
+            "dataset_path":       self.base_path,
+            "max_length":         self.preprocessor.max_length,
+            "tokenizer_path":     self.preprocessor.tokenizer.name_or_path,
+            "eos_token_id":       self.preprocessor.tokenizer.eos_token_id,
+            "stop_token_ids":     self._build_stop_token_ids(),
+            "cache_dir":          self.cache_dir,
+            "preprocessor":       type(self.preprocessor).__name__,
         }
 
     def preprocess(self, raw_input: Any) -> Dict[str, np.ndarray]:
-        """
-        단일 raw 입력을 토큰화합니다.
-
-        Args:
-            raw_input: dict {'question': str, 'context': str}
-                       또는 tuple (question: str, context: str)
-
-        Returns:
-            dict: {'input_ids': ndarray, 'attention_mask': ndarray}
-        """
-        if isinstance(raw_input, dict):
-            question = raw_input["question"]
-            context  = raw_input["context"]
-        else:
-            question, context = raw_input
-        return self.preprocess_strategy.tokenize(question=question, context=context)
+        """단일 raw 입력을 토큰화합니다. dict {'question', 'context'} 또는 tuple을 받습니다."""
+        return self.preprocessor.preprocess(raw_input)

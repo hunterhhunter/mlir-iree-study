@@ -8,10 +8,10 @@ Object Detection DataLoader
 
 import os
 import numpy as np
-from PIL import Image
-from typing import Dict, List, Any, Tuple
+from typing import Dict, List, Any, Tuple, Optional
 from .base import DataLoader
 from core.model_spec import Model_Spec
+from preprocessor.object_detection_preprocessor import ObjectDetectionPreprocessor
 
 class ObjectDetectionLoader(DataLoader):
     def __init__(self, model_spec: Model_Spec, **kwargs):
@@ -43,6 +43,21 @@ class ObjectDetectionLoader(DataLoader):
         self.target_hw = self._parse_target_shape(kwargs)
         self.mean, self.std = self._setup_normalization(kwargs)
         self.layout = kwargs.get("layout", "NCHW").upper()
+
+        # 4. 전처리기 초기화 (ObjectDetectionPreprocessor)
+        self.cache_dir: Optional[str] = kwargs.get("cache_dir", None)
+        if self.cache_dir:
+            os.makedirs(self.cache_dir, exist_ok=True)
+
+        if "preprocessor" in kwargs:
+            self.preprocessor: ObjectDetectionPreprocessor = kwargs["preprocessor"]
+        else:
+            self.preprocessor = ObjectDetectionPreprocessor(
+                target_hw=self.target_hw,
+                mean=self.mean,
+                std=self.std,
+                layout=self.layout,
+            )
 
 
     def _parse_target_shape(self, kwargs: Dict[str, Any]) -> Tuple[int, int]:
@@ -96,20 +111,24 @@ class ObjectDetectionLoader(DataLoader):
             return np.array(labels_list, dtype=np.float32)
         return np.empty((0, 5), dtype=np.float32)
 
+    def _load_or_preprocess(self, img_path: str, img_filename: str) -> np.ndarray:
+        """ObjectDetectionPreprocessor에 캐시 체크와 전처리를 위임합니다."""
+        cache_path = self.preprocessor.get_cache_path(self.cache_dir, img_filename)
+        return self.preprocessor.load_or_preprocess(cache_path, img_path)
+
     def load_single(self) -> Dict[str, Any]:
         """단일 이미지와 매칭되는 라벨을 로드하고 최종 딕셔너리로 패키징합니다."""
         if self.current_idx >= self.total_samples:
             raise StopIteration("모든 샘플이 소진되었습니다.")
-            
+
         img_filename = self.image_files[self.current_idx]
         self.current_idx += 1
-        
-        # 각 작업 위임
+
         img_path = os.path.join(self.image_dir, img_filename)
         label_path = self._get_label_path(img_filename)
         label_array = self._parse_yolo_label(label_path)
-        tensor = self.preprocess(img_path)
-        
+        tensor = self._load_or_preprocess(img_path, img_filename)
+
         return {
             "input": tensor,
             "label": label_array,
@@ -183,27 +202,5 @@ class ObjectDetectionLoader(DataLoader):
         }
 
     def preprocess(self, raw_input: Any) -> np.ndarray:
-        """순수 Numpy와 PIL 위주로 이미지 리사이즈 체인 수행"""
-        if isinstance(raw_input, str):
-            img = Image.open(raw_input)
-        else:
-            img = raw_input
-            
-        img = img.convert("RGB")
-        img = img.resize((self.target_hw[1], self.target_hw[0]), Image.Resampling.BILINEAR)
-        
-        # 스케일링 (0~255) -> (0.0~1.0)
-        img_array = np.array(img, dtype=np.float32) / 255.0
-        
-        # 정규화
-        img_array = (img_array - self.mean) / self.std
-        
-        # 3. 모델의 입맛에 맞게(NCHW vs NHWC) 메모리 레이아웃 변경 대응
-        if self.layout == "NHWC":
-            # 이미지가 (H, W, C) 형태이므로 그대로 통과
-            pass
-        else:
-            # 보편적인 PyTorch/ONNX 스타일인 NCHW (C, H, W) 포맷 전환
-            img_array = np.transpose(img_array, (2, 0, 1))
-            
-        return img_array
+        """단일 raw 입력을 전처리합니다. 파일 경로(str) 또는 PIL.Image 객체를 받습니다."""
+        return self.preprocessor.preprocess(raw_input)

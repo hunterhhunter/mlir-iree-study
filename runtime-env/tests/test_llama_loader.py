@@ -20,8 +20,8 @@ import pytest
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, project_root)
 
-from src.core.model_spec import Model_Spec, Task
-from src.dataloader import LlamaLoader, SQuADPreprocessStrategy, create_dataloader
+from core.model_spec import Model_Spec, Task
+from dataloader import LlamaLoader, SQuADPreprocessStrategy, create_dataloader
 
 
 # ------------------------------------------------------------------
