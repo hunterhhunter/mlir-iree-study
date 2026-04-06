@@ -77,7 +77,10 @@ class LlamaPreprocessor(BasePreprocessor):
 
     def get_cache_path(self, cache_dir: Optional[str], qa_id: str) -> Optional[str]:
         """
-        qa_id 기반으로 .npz 캐시 파일 경로를 생성합니다.
+        qa_id + 설정 fingerprint 기반으로 .npz 캐시 파일 경로를 생성합니다.
+
+        max_length나 tokenizer_path가 달라지면 다른 캐시 파일을 사용하므로
+        이전 설정의 캐시가 재사용되는 문제를 방지합니다.
 
         Args:
             cache_dir: 캐시 디렉토리 경로. None이면 None 반환.
@@ -88,7 +91,10 @@ class LlamaPreprocessor(BasePreprocessor):
         """
         if not cache_dir:
             return None
-        return str(Path(cache_dir) / f"{qa_id}.npz")
+        import hashlib
+        cfg_key = f"{self._strategy.tokenizer_path}:{self._strategy.max_length}"
+        cfg_hash = hashlib.md5(cfg_key.encode()).hexdigest()[:8]
+        return str(Path(cache_dir) / f"{qa_id}_{cfg_hash}.npz")
 
     # ------------------------------------------------------------------
     # 편의 속성 (LlamaLoader 메타데이터용)

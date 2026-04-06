@@ -14,8 +14,8 @@ def test_imagenet():
     val_labels_file = os.path.join(base_dir, "val_labels.txt")
     
     if not os.path.exists(val_images_dir):
-        print(f"[!] {val_images_dir} 이 존재하지 않습니다. 건너뜁니다.")
-        return
+        import pytest
+        pytest.skip(f"{val_images_dir} 이 존재하지 않습니다.")
 
     spec = Model_Spec(
         name="resnet50",
@@ -47,8 +47,8 @@ def test_cifar10():
     test_labels_file = os.path.join(base_dir, "test_labels.txt")
     
     if not os.path.exists(test_images_dir):
-        print(f"[!] {test_images_dir} 이 존재하지 않습니다. 건너뜁니다.")
-        return
+        import pytest
+        pytest.skip(f"{test_images_dir} 이 존재하지 않습니다.")
 
     # CIFAR-10 은 보통 32x32 해상도
     spec = Model_Spec(

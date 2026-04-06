@@ -25,7 +25,7 @@ from evaluators.llama_evaluator import LlamaEvaluator
 def _make_evaluator():
     mock_tok = MagicMock()
     mock_tok.decode.return_value = "Paris"
-    with patch("src.evaluators.llama_evaluator.AutoTokenizer") as mock_cls:
+    with patch("evaluators.llama_evaluator.AutoTokenizer") as mock_cls:
         mock_cls.from_pretrained.return_value = mock_tok
         evaluator = LlamaEvaluator(tokenizer_path="mock")
     return evaluator

@@ -273,8 +273,9 @@ class LlamaEvaluator(Evaluator):
         if first_line.lower() in self._NO_ANS_MARKERS:
             return ""
 
-        # 5. 비정상 길이 필터 (1자 미만 또는 100자 초과는 신뢰하기 어려움)
-        if len(first_line) < 1 or len(first_line) > 100:
+        # 5. 비정상 길이 필터 (1자 미만 또는 200자 초과는 hallucination으로 간주)
+        # SQuAD 2.0 정답 최대 길이 기준으로 200자 설정 (기존 100자는 일부 긴 정답을 오탈락시킴)
+        if len(first_line) < 1 or len(first_line) > 200:
             return ""
 
         return first_line

@@ -103,6 +103,11 @@ class MLPerfResNet50Preprocess(PreprocessStrategy):
 
         # Step 2: Center Crop → target_hw (보통 224×224)
         crop_h, crop_w = target_hw
+        if new_w < crop_w or new_h < crop_h:
+            raise ValueError(
+                f"Image size ({new_w}x{new_h}) after resize is smaller than crop size "
+                f"({crop_w}x{crop_h}). Increase short_side or decrease target_hw."
+            )
         left = (new_w - crop_w) // 2
         top  = (new_h - crop_h) // 2
         img  = img.crop((left, top, left + crop_w, top + crop_h))
@@ -135,6 +140,7 @@ class SQuADPreprocessStrategy(PreprocessStrategy):
             max_length (int): 최대 시퀀스 길이 (기본값 4096)
         """
         from transformers import AutoTokenizer
+        self.tokenizer_path = tokenizer_path
         self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_path)
         # LLaMA에는 pad_token이 없으므로 eos_token으로 대체 (표준 관행)
         if self.tokenizer.pad_token is None:

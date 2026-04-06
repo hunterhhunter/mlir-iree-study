@@ -2,15 +2,15 @@ import os
 import argparse
 import subprocess
 
-def run_cmd(cmd: str, description: str):
+def run_cmd(cmd: list, description: str):
     """
     셸 명령어를 실행하고 실시간 출력을 유지하는 헬퍼 함수
     """
     print(f"\n[*] {description}")
-    print(f"[*] Executing: {cmd}\n")
+    print(f"[*] Executing: {' '.join(cmd)}\n")
     try:
         # check=True: 0이 아닌 종료 코드가 나오면 에러 발생시킴
-        subprocess.run(cmd, shell=True, check=True)
+        subprocess.run(cmd, check=True)
         print("\n[+] Operation Completed Successfully!")
     except subprocess.CalledProcessError as e:
         print(f"\n[!] Export failed with exit code: {e.returncode}")
@@ -43,9 +43,12 @@ def main():
     # --model : 원본 소스
     # --task  : 작업 종류 강제 명시 (로컬 폴더에서 읽을 때 에러 방지)
     # 마지막 인자: 저장될 대상 폴더
-    dtype_flag = f"--dtype {args.dtype}" if args.dtype else ""
-    no_post_flag = "--no-post-process" if args.no_post_process else ""
-    cmd = f"optimum-cli export onnx --model {args.model} --task {args.task} {dtype_flag} {no_post_flag} {args.output}"
+    cmd = ["optimum-cli", "export", "onnx", "--model", args.model, "--task", args.task]
+    if args.dtype:
+        cmd += ["--dtype", args.dtype]
+    if args.no_post_process:
+        cmd.append("--no-post-process")
+    cmd.append(args.output)
 
     run_cmd(cmd, f"Exporting {args.model} to ONNX format...")
 
