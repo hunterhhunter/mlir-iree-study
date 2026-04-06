@@ -16,7 +16,7 @@ python datasets/load_imagenet_1k.py
 질의응답(Question Answering) 모델 평가에 사용되는 SQuAD 2.0 데이터셋의 검증 세트(`dev-v2.0.json`)를 자동으로 다운로드합니다.
 - **실행**:
 ```bash
-uv run datasets/download_squad2.py
+uv run datasets/prepare_squad2.py
 ```
 
 ### 3. ETTh1 / ETTm1 (Time Series Forecasting)
