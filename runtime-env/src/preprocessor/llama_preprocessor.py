@@ -25,10 +25,10 @@ class LlamaPreprocessor(BasePreprocessor):
 
     Args:
         tokenizer_path: HuggingFace 로컬 토크나이저 디렉토리 경로.
-        max_length:     최대 시퀀스 길이. 기본값 4096.
+        max_length:     최대 시퀀스 길이. 기본값 2048.
     """
 
-    def __init__(self, tokenizer_path: str, max_length: int = 4096):
+    def __init__(self, tokenizer_path: str, max_length: int = 2048):
         self._strategy = SQuADPreprocessStrategy(
             tokenizer_path=tokenizer_path,
             max_length=max_length,
