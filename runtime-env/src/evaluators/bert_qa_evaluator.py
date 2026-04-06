@@ -10,6 +10,10 @@ class BertQAEvaluator(Evaluator):
     OOM 방지를 위해 파이썬 for-loop를 완전 배제하고, DRY 원칙이 적용된 순수 Numpy 벡터화 로직만을 구동합니다.
     """
     def __init__(self, **eval_options):
+        self._reset()
+
+    def _reset(self):
+        """내부 상태를 초기화합니다. evaluate() 호출 시 자동으로 구동됩니다."""
         self._pred_starts: List[np.ndarray] = []
         self._pred_ends: List[np.ndarray] = []
         self._labels_list: List[Any] = []
@@ -32,24 +36,16 @@ class BertQAEvaluator(Evaluator):
         return metrics
 
     def evaluate(self, result: InferenceResult) -> Dict[str, Any]:
-        """추론 결과(InferenceResult) DTO를 받아 EM과 F1 스코어를 채점합니다."""
+        """추론 결과(InferenceResult) 전체를 받아 스트리밍 내부 로직으로 채점합니다."""
+        self._reset()
         
-        # 1. 모델 확률 텐서 역전파(Argmax)
-        pred_starts = np.argmax(result.outputs["start_logits"], axis=-1)
-        pred_ends = np.argmax(result.outputs["end_logits"], axis=-1)
+        # InferenceResult 전체 통짜 배열을 단일 배치인 것처럼 누산 상태에 추가
+        self._pred_starts.append(np.argmax(result.outputs["start_logits"], axis=-1))
+        self._pred_ends.append(np.argmax(result.outputs["end_logits"], axis=-1))
+        self._labels_list = result.labels if isinstance(result.labels, list) else [result.labels]
+        self._timing_records = list(result.timing_records)
         
-        # 2. 정답지(Labels) 평탄화 파싱 분리 위임
-        true_starts, true_ends = self._parse_flattened_labels(result.labels)
-
-        # 3. 채점 엔진 구동
-        metrics = self._calculate_qa_metrics(pred_starts, pred_ends, true_starts, true_ends)
-        total_samples = len(true_starts)
-        metrics["total_samples"] = total_samples
-        
-        # 4. Latency 지표 통합
-        metrics.update(self._calculate_latency_metrics(result.timing_records, total_samples))
-
-        return metrics
+        return self.compute()
 
     def _parse_flattened_labels(self, labels: List[Dict[str, np.ndarray]]) -> Tuple[np.ndarray, np.ndarray]:
         """단일 책임 원칙(SRP): 오프라인 베이킹 규격인 List[Dict] 형태의 라벨 덩어리들을 Numpy Flat 배열로 분리 추출합니다."""
