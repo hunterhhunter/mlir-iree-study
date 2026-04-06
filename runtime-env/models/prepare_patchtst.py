@@ -154,8 +154,8 @@ def export(model_path: str, output_path: str, context_length: int,
 
 def main():
     parser = argparse.ArgumentParser(description="PatchTST ONNX Export (optimum 없이)")
-    parser.add_argument("--model",             required=True,  help="로컬 디렉토리 또는 HuggingFace 모델 ID")
-    parser.add_argument("--output",            required=True,  help="출력 .onnx 파일 경로")
+    parser.add_argument("--model", type=str, default="ibm-granite/granite-timeseries-patchtst", help="로컬 디렉토리 또는 HuggingFace 모델 ID")
+    parser.add_argument("--output", type=str, default="models/ibm-research_patchtst-fm-r1-ONNX/model.onnx", help="출력 .onnx 파일 경로")
     parser.add_argument("--context-length",    type=int, default=512,  help="입력 시퀀스 길이 (기본 512)")
     parser.add_argument("--channels",          type=int, default=7,    help="입력 채널 수 (기본 7, ETTm1)")
     parser.add_argument("--prediction-length", type=int, default=96,   help="예측 호라이즌 (기본 96)")
