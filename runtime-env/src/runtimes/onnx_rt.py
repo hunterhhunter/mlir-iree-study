@@ -10,7 +10,8 @@ preload_cuda_libs()
 import onnxruntime as ort
 
 import time
-from .base import Runtime, GenerationResult
+from .base import Runtime
+from core.generation_result import GenerationResult
 from core.compiled_model import CompiledModel
 
 class OnnxRuntime(Runtime):

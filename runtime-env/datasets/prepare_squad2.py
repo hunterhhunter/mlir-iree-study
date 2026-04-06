@@ -1,7 +1,7 @@
 import os
 import urllib.request
 
-def download_squad2():
+def prepare_squad2():
     base_dir = os.path.join("datasets", "squad2")
     os.makedirs(base_dir, exist_ok=True)
     
@@ -16,4 +16,4 @@ def download_squad2():
         print(f"[!] Failed to download SQuAD 2.0: {e}\n")
 
 if __name__ == "__main__":
-    download_squad2()
+    prepare_squad2()

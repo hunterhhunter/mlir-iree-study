@@ -5,13 +5,13 @@ optimum-cli 없이 순수 transformers + torch.onnx.export로 PatchTST 계열 �
 
 사용법:
     # 로컬 모델 디렉토리 (patchtst_fm config를 PatchTSTConfig로 변환하여 로드)
-    uv run models/export_onnx_patchtst.py \
+    uv run models/prepare_patchtst.py \
         --model models/ibm-research_patchtst-fm-r1/ \
         --output models/ibm-research_patchtst-fm-r1-ONNX/model.onnx \
         --context-length 512 --channels 7 --prediction-length 96
 
     # HuggingFace 모델 ID 직접 사용
-    uv run models/export_onnx_patchtst.py \
+    uv run models/prepare_patchtst.py \
         --model ibm-granite/granite-timeseries-patchtst \
         --output models/patchtst-ONNX/model.onnx
 """
@@ -154,8 +154,8 @@ def export(model_path: str, output_path: str, context_length: int,
 
 def main():
     parser = argparse.ArgumentParser(description="PatchTST ONNX Export (optimum 없이)")
-    parser.add_argument("--model",             required=True,  help="로컬 디렉토리 또는 HuggingFace 모델 ID")
-    parser.add_argument("--output",            required=True,  help="출력 .onnx 파일 경로")
+    parser.add_argument("--model", type=str, default="ibm-granite/granite-timeseries-patchtst", help="로컬 디렉토리 또는 HuggingFace 모델 ID")
+    parser.add_argument("--output", type=str, default="models/ibm-research_patchtst-fm-r1-ONNX/model.onnx", help="출력 .onnx 파일 경로")
     parser.add_argument("--context-length",    type=int, default=512,  help="입력 시퀀스 길이 (기본 512)")
     parser.add_argument("--channels",          type=int, default=7,    help="입력 채널 수 (기본 7, ETTm1)")
     parser.add_argument("--prediction-length", type=int, default=96,   help="예측 호라이즌 (기본 96)")

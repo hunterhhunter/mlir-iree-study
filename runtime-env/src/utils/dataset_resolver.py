@@ -7,11 +7,15 @@ def resolve_dataset_paths(task: Task, dataset_path: str, image_dir_arg: str, lab
     Convention over Configuration (CoC) 데이터셋 스니핑 전담 해결사 플러그인.
     로더(Loader) 클래스들을 대신해 폴더 내부 냄새를 맡고 정확한 절대 주소를 규명합니다.
     """
-    if not dataset_path:
-        raise ValueError("[Resolver] --dataset 경로가 제공되지 않았습니다.")
+    # 1. 태스크별 예외 처리 (Generation 모델은 자체 내장 더미 또는 프롬프트를 쓰므로 dataset 경로가 옵션일 수 있음)
+    if not dataset_path and task not in [Task.NLP_GENERATION]:
+        raise ValueError(f"[Resolver] 파이프라인(Task: {task.name})은 --dataset 경로가 필수입니다.")
         
     image_dir = ""
     label_path = ""
+    
+    if not dataset_path:
+        return "", ""
     
     # 1. 사용자가 --image-dir, --label-dir을 명시적으로 주었다면 100% 최우선 신뢰
     if image_dir_arg:

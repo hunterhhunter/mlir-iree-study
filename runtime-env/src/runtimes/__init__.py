@@ -5,7 +5,8 @@ Runtime Package Initialization & Factory
 다양한 Runtime 엔진(ONNX, IREE 등)에 대한 손쉬운 접근(단일 진입점 API)을 제공합니다.
 """
 
-from .base import Runtime, GenerationResult
+from .base import Runtime
+from core.generation_result import GenerationResult
 from .onnx_rt import OnnxRuntime
 from .iree_rt import IREERuntime
 from .vllm_rt import VllmRuntime
