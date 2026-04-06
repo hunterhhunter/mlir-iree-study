@@ -58,6 +58,9 @@ nvidia-nvshmem-cu12==3.4.5
 nvidia-nvtx-cu12==12.8.90
 onnx==1.20.1
 onnx-ir==0.2.0
+# IMPORTANT: onnxruntime (CPU 전용)과 동시 설치 금지 — 동시 설치 시 libonnxruntime.so가
+# CPU 버전으로 덮어써져 CUDAExecutionProvider가 비활성화됩니다.
+# 설치 후 확인: pip show onnxruntime 이 출력되면 즉시 pip uninstall onnxruntime
 onnxruntime-gpu==1.24.4
 onnxscript==0.6.2
 onnxslim==0.1.90

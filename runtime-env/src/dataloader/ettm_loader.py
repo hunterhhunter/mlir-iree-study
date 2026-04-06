@@ -81,7 +81,7 @@ class ETTmLoader(DataLoader):
         self.feature_cols: List[str] = _ETTM_FEATURE_COLS if target_cols is None else list(target_cols)
 
         stride = kwargs.get("stride", None)
-        self.stride = int(stride) if stride is not None else self.prediction_length
+        self.stride = int(stride) if stride is not None else 12
 
         # --- 데이터 로드 & 분할 ---
         self._data = self._load_csv(csv_path)          # (N, C) float32

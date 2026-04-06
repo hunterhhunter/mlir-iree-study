@@ -152,6 +152,17 @@ def main():
         loader_kwargs["tokenizer_path"] = args.tokenizer_path
     if task_enum == Task.TIME_SERIES_FORECASTING:
         loader_kwargs["csv_path"] = args.dataset
+        # csv_path 옆 .cache_npz 폴더를 캐시 디렉토리로 자동 지정
+        csv_dir = os.path.dirname(os.path.abspath(args.dataset))
+        loader_kwargs["cache_dir"] = os.path.join(csv_dir, ".cache_npz")
+    elif task_enum in (Task.IMAGE_CLASSIFICATION, Task.OBJECT_DETECTION):
+        # 이미지 데이터셋 디렉토리 옆에 .cache_npz 자동 지정
+        loader_kwargs["cache_dir"] = os.path.join(os.path.abspath(args.dataset), ".cache_npz")
+    elif task_enum == Task.NLP_GENERATION:
+        # val.json 옆 .cache_npz 자동 지정
+        loader_kwargs["cache_dir"] = os.path.join(
+            os.path.dirname(os.path.abspath(args.dataset)), ".cache_npz"
+        )
 
     loader = create_dataloader(
         model_spec=spec,
