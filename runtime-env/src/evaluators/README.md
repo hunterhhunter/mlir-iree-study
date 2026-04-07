@@ -15,7 +15,21 @@
 - **`__init__.py` (Facade & Factory)**
   - 입력받은 `Model_Spec` 내부의 `Task` 필드(`IMAGE_CLASSIFICATION` 등)만을 분석하여 상황에 딱 알맞은 평가기(Evaluator) 인스턴스를 동적으로 찍어내고 반환하는 `create_evaluator()` 팩토리(Factory)를 제공합니다.
 
-## 확장 방법 (NLP, Object Detection 지원 시)
-추후 자연어나 욜로(YOLO) 객체 탐지 태스크를 지원해야 할 때:
-1. `Evaluator`를 상속하는 새 채점기 파일(`object_detection_evaluator.py`)을 생성 및 구현.
-2. `__init__.py` 안의 `create_evaluator()` 팩토리 함수에 `if task == Task.OBJECT_DETECTION:` 조건을 추가하여 바인딩.
+## 지원 평가기 목록
+
+현재 다음 태스크의 평가기가 구현되어 있습니다:
+
+| 태스크 | 클래스 | 주요 메트릭 |
+|---|---|---|
+| `IMAGE_CLASSIFICATION` | `ImageClassificationEvaluator` | Top-1, Top-5, Precision, Recall, F1 |
+| `OBJECT_DETECTION` | `ObjectDetectionEvaluator` | mAP, FPS |
+| `NLP_CLASSIFICATION` | `BertClassificationEvaluator` | Accuracy, F1 |
+| `NLP_QA` | `BertQAEvaluator` | Exact Match, F1, QPS |
+| `NLP_GENERATION` | `LlamaEvaluator` | TTFT, TPOT, Throughput |
+| `TIME_SERIES_FORECASTING` | `TimeSeriesForecastingEvaluator` | MSE, MAE |
+
+## 새로운 태스크 평가기 추가 방법
+
+새로운 태스크 평가기를 추가할 때:
+1. `Evaluator`를 상속하는 새 채점기 파일(예: `my_evaluator.py`)을 생성 및 구현.
+2. `__init__.py` 안의 `create_evaluator()` 팩토리 함수에 해당 조건을 추가하여 바인딩.

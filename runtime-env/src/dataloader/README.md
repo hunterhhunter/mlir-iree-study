@@ -40,9 +40,22 @@ except StopIteration:
 
 ---
 
+## 지원 로더 목록
+
+현재 다음 태스크의 로더가 등록되어 있습니다:
+
+| 태스크 | 클래스 | 데이터셋 |
+|---|---|---|
+| `IMAGE_CLASSIFICATION` | `ImageClassificationLoader` | ImageNet-1K |
+| `OBJECT_DETECTION` | `ObjectDetectionLoader` | COCO128 |
+| `NLP_GENERATION` | `LlamaLoader` | SQuAD 2.0 |
+| `NLP_CLASSIFICATION` | `BertClassificationLoader` | SST-2 numpy |
+| `NLP_QA` | `BertQALoader` | SQuAD numpy |
+| `TIME_SERIES_FORECASTING` | `ETTmLoader` | ETTh1 |
+
 ## 🛠 새로운 Task의 로더(Loader)를 생성하는 방법
 
-추후 영상 처리가 아닌 `NLP`나 `Object Detection` 처럼 데이터셋 폴더 구조와 전처리 로직이 완전히 다른 Task를 지원해야 한다면 다음 순서에 따라 확장이 가능합니다.
+데이터셋 폴더 구조와 전처리 로직이 완전히 다른 Task를 지원해야 한다면 다음 순서에 따라 확장이 가능합니다.
 
 ### Step 1. 구체 로더 클래스 작성
 `src/dataloader/` 내부 어딘가(예: `nlp_loader.py`)에 새로운 스크립트를 파고,
