@@ -151,6 +151,16 @@ class ETTmLoader(DataLoader):
     # 내부 헬퍼
     # ------------------------------------------------------------------
 
+    def get_train_stats(self):
+        """학습 구간(train split)의 전역 mean/std를 반환합니다. (evaluator global 정규화용)"""
+        if self.split_boundaries is not None:
+            train_end = int(self.split_boundaries[0])
+        else:
+            n = len(self._data)
+            train_end = int(n * (1.0 - self.val_ratio - self.test_ratio))
+        train_data = self._data[:train_end]
+        return train_data.mean(axis=0), train_data.std(axis=0)
+
     def _load_csv(self, csv_path: str) -> np.ndarray:
         """CSV를 읽어 feature_cols 컬럼만 추출한 (N, C) float32 배열을 반환합니다."""
         import pandas as pd

@@ -30,10 +30,17 @@ class TimeSeriesForecastingEvaluator(Evaluator):
                  output_key: Optional[str] = None,
                  train_global_mean: Optional[np.ndarray] = None,
                  train_global_std: Optional[np.ndarray] = None,
+                 dataloader=None,
                  **kwargs):
         self._output_key = output_key
-        self.train_global_mean = train_global_mean if train_global_mean is not None else 0.0
-        self.train_global_std = train_global_std if train_global_std is not None else 1.0
+        if train_global_mean is not None:
+            self.train_global_mean = train_global_mean
+            self.train_global_std  = train_global_std if train_global_std is not None else 1.0
+        elif dataloader is not None and hasattr(dataloader, "get_train_stats"):
+            self.train_global_mean, self.train_global_std = dataloader.get_train_stats()
+        else:
+            self.train_global_mean = 0.0
+            self.train_global_std  = 1.0
         self._reset()
 
     # ------------------------------------------------------------------

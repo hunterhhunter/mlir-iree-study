@@ -177,9 +177,21 @@ class ObjectDetectionEvaluator(Evaluator):
     def _process_predictions(
         self, preds: np.ndarray, img_idx_offset: int
     ) -> Tuple[List[List[float]], int]:
-        """예측 텐서를 파싱하고 NMS를 적용해 경량 박스 리스트로 변환합니다."""
+        """예측 텐서를 파싱하고 NMS를 적용해 경량 박스 리스트로 변환합니다.
+
+        YOLOv5 형식: (B, anchors, 85) — [cx,cy,w,h, obj_conf, cls×80]
+        YOLOv8 형식: (B, 84, anchors) — [cx,cy,w,h, cls×80] (objectness 없음, 전치 필요)
+        """
         all_preds = []
         total_detected = 0
+
+        # YOLOv8 형식 감지: (B, features, anchors) → (B, anchors, features) 로 전치
+        # features 차원(dim=1)이 anchors 차원(dim=2)보다 작으면 전치가 필요
+        if preds.ndim == 3 and preds.shape[1] < preds.shape[2]:
+            preds = np.transpose(preds, (0, 2, 1))  # (B, anchors, features)
+            is_yolov8 = True
+        else:
+            is_yolov8 = False
 
         for local_idx in range(preds.shape[0]):
             img_preds = preds[local_idx]
@@ -193,15 +205,28 @@ class ObjectDetectionEvaluator(Evaluator):
                     axis=1
                 )
 
-                obj_conf = img_preds[:, 4]
-                mask = obj_conf > self.conf_threshold
-                filtered_boxes       = boxes[mask]
-                filtered_conf        = obj_conf[mask]
-                filtered_class_probs = img_preds[mask, 5:]
+                if is_yolov8:
+                    # YOLOv8: objectness 없음, 클래스 점수 최대값을 confidence로 사용
+                    class_probs = img_preds[:, 4:]
+                    class_confs = np.max(class_probs, axis=1)
+                    mask = class_confs > self.conf_threshold
+                    filtered_boxes       = boxes[mask]
+                    filtered_conf        = class_confs[mask]
+                    filtered_class_probs = class_probs[mask]
+                else:
+                    # YOLOv5: objectness × class_prob
+                    obj_conf = img_preds[:, 4]
+                    mask = obj_conf > self.conf_threshold
+                    filtered_boxes       = boxes[mask]
+                    filtered_conf        = obj_conf[mask]
+                    filtered_class_probs = img_preds[mask, 5:]
 
                 if len(filtered_boxes) > 0:
-                    class_ids  = np.argmax(filtered_class_probs, axis=1)
-                    final_confs = filtered_conf * np.max(filtered_class_probs, axis=1)
+                    class_ids   = np.argmax(filtered_class_probs, axis=1)
+                    if is_yolov8:
+                        final_confs = filtered_conf
+                    else:
+                        final_confs = filtered_conf * np.max(filtered_class_probs, axis=1)
 
                     keep_indices = self._nms_pure_numpy(
                         filtered_boxes, final_confs, self.iou_threshold
@@ -256,11 +281,14 @@ class ObjectDetectionEvaluator(Evaluator):
         recalls    = tpc / np.maximum(nt, 1e-6)
         precisions = tpc / np.maximum(fpc + tpc, 1e-6)
 
-        for i in range(len(precisions) - 1, 0, -1):
-            precisions[i - 1] = np.maximum(precisions[i - 1], precisions[i])
+        # 표준 VOC AP 계산: sentinel 경계값 추가 후 precision envelope 적용
+        mrec = np.concatenate(([0.0], recalls, [1.0]))
+        mpre = np.concatenate(([0.0], precisions, [0.0]))
+        for i in range(len(mpre) - 1, 0, -1):
+            mpre[i - 1] = np.maximum(mpre[i - 1], mpre[i])
 
-        idx_res = np.where(recalls[1:] != recalls[:-1])[0]
-        ap = np.sum((recalls[idx_res + 1] - recalls[idx_res]) * precisions[idx_res + 1])
+        idx_res = np.where(mrec[1:] != mrec[:-1])[0]
+        ap = np.sum((mrec[idx_res + 1] - mrec[idx_res]) * mpre[idx_res + 1])
         return float(ap)
 
     def _calculate_mean_ap(

@@ -1,0 +1,9 @@
+# pip constraints: ultralytics 등 패키지가 onnxruntime (CPU 전용)을 의존성으로 끌어올 때
+# onnxruntime-gpu 버전을 강제 고정합니다.
+# 사용법: pip install -r requirements.txt -c constraints.txt
+#
+# 주의: onnxruntime (CPU)과 onnxruntime-gpu는 패키지 이름이 달라서
+#       constraints만으로는 CPU 버전 설치를 완전히 막을 수 없습니다.
+#       install.sh를 사용하면 설치 후 자동으로 CPU 버전을 제거합니다.
+
+onnxruntime-gpu==1.24.4

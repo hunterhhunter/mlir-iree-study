@@ -1,12 +1,12 @@
 """
-Download meta-llama/Llama-3.2-3B from Hugging Face Hub and optionally convert to ONNX.
+Download meta-llama/Llama-3.2-3B from Hugging Face Hub and convert to ONNX fp16 by default.
 Usage:
-    python models/prepare_llama_3_2_3b.py
-    python models/prepare_llama_3_2_3b.py --format onnx
+    python models/prepare_llama_3_2_3b.py                          # 다운로드 + ONNX fp16 변환 (기본값)
+    python models/prepare_llama_3_2_3b.py --dtype fp32             # ONNX fp32 변환
+    python models/prepare_llama_3_2_3b.py --no-convert-onnx        # 변환 없이 다운로드만
+    python models/prepare_llama_3_2_3b.py --format onnx            # 특정 포맷 다운로드
     python models/prepare_llama_3_2_3b.py --output /path/to/models
-    python models/prepare_llama_3_2_3b.py --convert-onnx
-    python models/prepare_llama_3_2_3b.py --convert-onnx --dtype fp16
-    python models/prepare_llama_3_2_3b.py --convert-onnx --no-post-process
+    python models/prepare_llama_3_2_3b.py --no-post-process
 """
 import sys
 import os
@@ -80,18 +80,18 @@ if __name__ == "__main__":
                         help="Specific model format to include (e.g., 'onnx', 'safetensors')")
     parser.add_argument("--output", type=str, default="models",
                         help="Output root directory (default: models)")
-    parser.add_argument("--convert-onnx", action="store_true",
-                        help="Download safetensors model and convert to ONNX using optimum-cli")
-    parser.add_argument("--dtype", type=str, default=None,
-                        help="ONNX export dtype (e.g., fp16, fp32). Only used with --convert-onnx")
+    parser.add_argument("--no-convert-onnx", action="store_true",
+                        help="ONNX 변환을 건너뛰고 다운로드만 수행")
+    parser.add_argument("--dtype", type=str, default="fp16",
+                        help="ONNX export dtype (e.g., fp16, fp32). 기본값: fp16")
     parser.add_argument("--no-post-process", action="store_true",
                         help="Skip post-process validation after ONNX export (use when RAM is limited)")
     args = parser.parse_args()
 
-    if args.convert_onnx:
+    if not args.no_convert_onnx:
         # safetensors 다운로드 후 ONNX 변환
         src_dir = os.path.join(args.output, MODEL_NAME)
         download_model_repository(REPO_ID, "safetensors", args.output)
         convert_to_onnx(src_dir, args.output, dtype=args.dtype, no_post_process=args.no_post_process)
     else:
-        download_model_repository(REPO_ID, args.format, args.output)
+        download_model_repository(REPO_ID, args.format or "safetensors", args.output)

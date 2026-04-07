@@ -39,6 +39,7 @@ class VllmRuntime(Runtime):
         self.gpu_memory_utilization = runtime_options.get("gpu_memory_utilization", 0.90)
         self.max_model_len = runtime_options.get("max_model_len", None)
         self.dtype = runtime_options.get("dtype", "auto")
+        self.enforce_eager = runtime_options.get("enforce_eager", False)
 
         self._llm = None
         self._model_path: str = ""
@@ -75,6 +76,7 @@ class VllmRuntime(Runtime):
             tensor_parallel_size=self.tensor_parallel_size,
             max_model_len=self.max_model_len,
             dtype=self.dtype,
+            enforce_eager=self.enforce_eager,
         )
         if self.device == "cpu":
             # CPU 모드: CUDA graph 캡처 불가, gpu_memory_utilization 비적용

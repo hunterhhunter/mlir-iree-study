@@ -57,6 +57,7 @@ def main():
     parser.add_argument("--max-steps", type=int, default=None, help="시간이 지루할 때 쓸 강제 종료 리미트 (옵션)")
     parser.add_argument("--max-new-tokens", type=int, default=256, help="LLM 생성 최대 토큰 수 (기본: 256)")
     parser.add_argument("--max-model-len", type=int, default=None, help="vLLM 최대 컨텍스트 길이 (기본: 모델 기본값, 메모리 부족 시 줄이세요)")
+    parser.add_argument("--enforce-eager", action="store_true", default=None, help="vLLM CUDA 그래프 캡처 비활성화 (메모리 부족 시 사용)")
     parser.add_argument("--debug", action="store_true", help="샘플별 예측/정답/점수 로그 출력 (기본: 비활성)")
     
     args = parser.parse_args()
@@ -176,6 +177,12 @@ def main():
         runtime_kwargs = {}
         if args.max_model_len is not None:
             runtime_kwargs["max_model_len"] = args.max_model_len
+        elif "default_max_model_len" in profile:
+            runtime_kwargs["max_model_len"] = profile["default_max_model_len"]
+        if args.enforce_eager:
+            runtime_kwargs["enforce_eager"] = True
+        elif "default_enforce_eager" in profile:
+            runtime_kwargs["enforce_eager"] = profile["default_enforce_eager"]
         runtime = create_runtime(args.backend, device=args.device, **runtime_kwargs)
     except Exception as e:
         print(f"[Error] {e}")
@@ -189,6 +196,8 @@ def main():
         evaluator_kwargs["tokenizer_path"] = args.tokenizer_path
     if args.debug:
         evaluator_kwargs["debug"] = True
+    if task_enum == Task.TIME_SERIES_FORECASTING:
+        evaluator_kwargs["dataloader"] = loader
     evaluator = create_evaluator(spec, top_k=(1, 5), **evaluator_kwargs)
     
     # 3. 오케스트레이터 구동
