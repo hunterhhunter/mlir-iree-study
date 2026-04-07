@@ -57,6 +57,7 @@ def main():
     parser.add_argument("--max-steps", type=int, default=None, help="시간이 지루할 때 쓸 강제 종료 리미트 (옵션)")
     parser.add_argument("--max-new-tokens", type=int, default=256, help="LLM 생성 최대 토큰 수 (기본: 256)")
     parser.add_argument("--max-model-len", type=int, default=None, help="vLLM 최대 컨텍스트 길이 (기본: 모델 기본값, 메모리 부족 시 줄이세요)")
+    parser.add_argument("--gpu-memory-utilization", type=float, default=None, help="vLLM GPU 메모리 사용률 0.0~1.0 (기본: 0.90, OOM 시 낮추세요 예: 0.7)")
     parser.add_argument("--enforce-eager", action="store_true", default=None, help="vLLM CUDA 그래프 캡처 비활성화 (메모리 부족 시 사용)")
     parser.add_argument("--debug", action="store_true", help="샘플별 예측/정답/점수 로그 출력 (기본: 비활성)")
     
@@ -179,6 +180,10 @@ def main():
             runtime_kwargs["max_model_len"] = args.max_model_len
         elif "default_max_model_len" in profile:
             runtime_kwargs["max_model_len"] = profile["default_max_model_len"]
+        if args.gpu_memory_utilization is not None:
+            runtime_kwargs["gpu_memory_utilization"] = args.gpu_memory_utilization
+        elif "default_gpu_memory_utilization" in profile:
+            runtime_kwargs["gpu_memory_utilization"] = profile["default_gpu_memory_utilization"]
         if args.enforce_eager:
             runtime_kwargs["enforce_eager"] = True
         elif "default_enforce_eager" in profile:
