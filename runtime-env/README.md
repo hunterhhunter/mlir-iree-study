@@ -103,5 +103,3 @@ python -m pytest tests/test_factory_api.py tests/test_bert_qa_loader.py -v
 # 전체 ONNX 벤치마크 일괄 실행
 python tests/run_all_onnx_benchmarks.py
 ```
-
-상세 아키텍처 설명은 [CLAUDE.md](CLAUDE.md)를 참조하세요.
