@@ -16,7 +16,12 @@
 ```text
 mlir-iree-study/
 ├── 📁 src/         # 완성된 메인 코드 (Shared Codebase)
-├── 📁 docs/        # 연구 보고서 및 학습 노트 (Documentation)
-├── 📁 scripts/     # 자동화 및 유틸리티 스크립트 (Utilities)
-└── 📁 personal/    # 개인별 실험 공간
-└── 📁 runtime-env/ # 모델을 IREE, Pytorch 등 실행해볼 수 있는 환경
+├── 📁 runtime-env/ # AI 벤치마크 프레임워크 (메인 코드베이스)
+│   ├── src/        #   BenchmarkRunner, DataLoader, Runtime, Evaluator
+│   ├── datasets/   #   데이터셋 다운로드 스크립트 (prepare_*.py)
+│   ├── models/     #   모델 다운로드/변환 스크립트 (prepare_*.py)
+│   └── tests/      #   단위 테스트 및 E2E 벤치마크
+├── 📁 docs/        # 연구 보고서 및 학습 노트
+│   ├── researchers.md  # ML 컴파일러 연구자 목록
+│   └── seminar.md      # 세미나 아카이브
+└── 📁 personal/    # 개인별 실험 공간 (jihawn, kwanghoon, youngjin)

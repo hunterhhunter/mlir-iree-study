@@ -7,7 +7,7 @@ import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src")))
 
 from runtimes.iree_rt import IREERuntime
-from data_loader import DataLoader
+from dataloader.base import DataLoader
 
 class TestIREERuntime(unittest.TestCase):
     @classmethod
